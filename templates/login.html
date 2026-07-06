@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录界面</title>
+    <style>
+        /* 登录页面整体样式 */
+        .login {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background:
+                linear-gradient(rgba(22, 183, 119, 0.82), rgba(19, 132, 87, 0.88)),
+                url("https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1600&q=80")
+                center / cover no-repeat;
+        }
+
+        /* 登录框容器样式 */
+        .login1 {
+            width: 360px;
+            max-width: calc(100% - 40px);
+            text-align: center;
+            padding: 30px;
+            margin: 100px;
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.94);
+            box-shadow: 0 20px 50px rgba(7, 68, 44, 0.25);
+        }
+
+        h2 {
+            margin: 0 0 24px;
+            color: #116b47;
+            font-size: 28px;
+        }
+
+        input {
+            width: 100%;
+            height: 44px;
+            margin-bottom: 16px;
+            padding: 0 12px;
+            border: 1px solid #b7d8c9;
+            border-radius: 6px;
+            outline: none;
+            font-size: 15px;
+        }
+
+        input:focus {
+            border-color: #16b777;
+            box-shadow: 0 0 0 3px rgba(22, 183, 119, 0.18);
+        }
+
+        button {
+            width: 100%;
+            height: 42px;
+            margin-top: 6px;
+            border: 0;
+            border-radius: 6px;
+            color: white;
+            background-color: #16b777;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #129963;
+        }
+
+        button[type="reset"] {
+            color: #116b47;
+            background-color: #e5f6ef;
+        }
+
+        .message {
+            margin: 16px 0 0;
+            color: #116b47;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body class="login">
+    <!-- 页面主要内容将写在这里 -->
+    <form class="login1" method="post">
+        <h2>登录</h2>
+        <!-- 账号输入框 -->
+        <div>
+            <input placeholder="请输入用户名" name="username">
+        </div>
+        <!-- 密码输入框 -->
+        <div>
+            <input placeholder="请输入密码" name="password" type="password">
+        </div>
+        <!-- 交互按钮 -->
+        <div>
+            <button type="submit">提交</button>
+        </div>
+        <div>
+            <button type="reset">重置</button>
+        </div>
+        {% if username %}
+        <p class="message">已提交用户：{{ username }}</p>
+        {% endif %}
+    </form>
+</body>
+</html>
