@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}系统主界面{% endblock %}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            color: #183c2b;
+            background: #f2f8f5;
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 240px;
+            padding: 28px 20px;
+            color: white;
+            background: #116b47;
+        }
+
+        .logo {
+            margin-bottom: 34px;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .menu {
+            display: grid;
+            gap: 10px;
+        }
+
+        .menu a {
+            display: block;
+            padding: 12px 14px;
+            border-radius: 6px;
+            color: #dcfce7;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .menu a.active,
+        .menu a:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.16);
+        }
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            border-bottom: 1px solid #d7e8df;
+            background: white;
+        }
+
+        .topbar h1 {
+            margin: 0;
+            color: #113f2c;
+            font-size: 22px;
+        }
+
+        .logout {
+            padding: 9px 14px;
+            border-radius: 6px;
+            color: white;
+            background: #16b777;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .content {
+            flex: 1;
+            padding: 32px;
+        }
+
+        @media (max-width: 720px) {
+            .layout {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+            }
+
+            .topbar {
+                height: auto;
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 12px;
+                padding: 20px;
+            }
+
+            .content {
+                padding: 22px;
+            }
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="logo">温室环境监控<br>Web 系统</div>
+            <nav class="menu">
+                <a class="active" href="{{ url_for('home') }}">系统首页</a>
+                <a href="#">个人信息</a>
+                <a href="{{ url_for('cloud_login') }}">云平台授权</a>
+                <a href="#">设备管理</a>
+            </nav>
+        </aside>
+
+        <section class="main">
+            <header class="topbar">
+                <h1>{% block page_title %}系统主界面{% endblock %}</h1>
+                <a class="logout" href="{{ url_for('logout') }}">退出登录</a>
+            </header>
+
+            <main class="content">
+                {% block content %}{% endblock %}
+            </main>
+        </section>
+    </div>
+</body>
+</html>

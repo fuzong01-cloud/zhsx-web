@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录界面</title>
+    <title>云平台授权</title>
     <style>
         * {
             box-sizing: border-box;
@@ -17,18 +17,16 @@
             justify-content: center;
             padding: 36px 20px;
             font-family: "Microsoft YaHei", Arial, sans-serif;
-            background:
-                linear-gradient(135deg, rgba(8, 88, 56, 0.88), rgba(22, 183, 119, 0.72)),
-                url("https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1600&q=80")
-                center / cover no-repeat;
+            background: #f2f8f5;
         }
 
-        .login-box {
-            width: 390px;
+        .box {
+            width: 430px;
+            max-width: 100%;
             padding: 34px 32px;
             border-radius: 8px;
-            background: rgba(255, 255, 255, 0.96);
-            box-shadow: 0 24px 70px rgba(0, 45, 28, 0.32);
+            background: white;
+            box-shadow: 0 24px 70px rgba(0, 45, 28, 0.18);
         }
 
         h1 {
@@ -39,7 +37,7 @@
         }
 
         .subtitle {
-            margin: 0 0 24px;
+            margin: 0 0 26px;
             color: #6b7c72;
             font-size: 14px;
             text-align: center;
@@ -50,10 +48,20 @@
             margin-bottom: 18px;
             padding: 12px 14px;
             border-radius: 6px;
+            font-size: 14px;
+            border-left: 4px solid;
+        }
+
+        .message.error {
             color: #9f1239;
             background: #ffe4e6;
-            font-size: 14px;
-            border-left: 4px solid #e11d48;
+            border-color: #e11d48;
+        }
+
+        .message.success {
+            color: #116b47;
+            background: #e9f7f0;
+            border-color: #16b777;
         }
 
         .form-group {
@@ -88,79 +96,66 @@
 
         .button-row {
             display: flex;
-            gap: 12px;
-            margin-top: 8px;
+            gap: 14px;
+            margin-top: 10px;
         }
 
-        button {
+        button,
+        a {
             flex: 1;
             height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             border: none;
             border-radius: 6px;
             font-size: 15px;
+            text-decoration: none;
             cursor: pointer;
         }
 
-        button[type="submit"] {
+        button {
             color: white;
             background: #16b777;
         }
 
-        button[type="submit"]:hover {
+        button:hover {
             background: #129963;
         }
 
-        button[type="reset"] {
+        a {
             color: #116b47;
             background: #e9f7f0;
         }
 
-        .register-link {
-            display: block;
-            margin-top: 16px;
-            color: #116b47;
-            text-align: center;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .tip {
-            margin: 20px 0 0;
-            color: #7c8f85;
-            font-size: 13px;
-            line-height: 1.7;
-            text-align: center;
+        a:hover {
+            background: #d8f1e6;
         }
     </style>
 </head>
 <body>
-    <form class="login-box" method="post">
-        <h1>系统登录</h1>
-        <p class="subtitle">请输入 11 位数字用户名和密码</p>
+    <form class="box" method="post">
+        <h1>云平台授权</h1>
+        <p class="subtitle">根据 NLECloud 文档，先用账号密码登录获取 AccessToken，再请求设备数据。</p>
 
         {% if message %}
-        <div class="message">{{ message }}</div>
+        <div class="message {{ message_type }}">{{ message }}</div>
         {% endif %}
 
         <div class="form-group">
-            <label for="username">用户名</label>
-            <input id="username" name="username" value="{{ username or '' }}" placeholder="请输入 11 位数字用户名">
+            <label for="account">NLECloud 账号</label>
+            <input id="account" name="account" placeholder="请输入云平台账号" autocomplete="username">
         </div>
 
         <div class="form-group">
-            <label for="password">密码</label>
-            <input id="password" name="password" type="password" placeholder="请输入密码">
+            <label for="password">NLECloud 密码</label>
+            <input id="password" name="password" type="password" placeholder="请输入云平台密码" autocomplete="current-password">
         </div>
 
         <div class="button-row">
-            <button type="submit">登录</button>
-            <button type="reset">重置</button>
+            <button type="submit">获取 Token</button>
+            <a href="{{ url_for('home') }}">返回系统</a>
         </div>
-
-        <a class="register-link" href="{{ url_for('register') }}">没有账号？去注册</a>
-
-        <p class="tip">测试账号：15600002034<br>测试密码：123456</p>
     </form>
 </body>
 </html>

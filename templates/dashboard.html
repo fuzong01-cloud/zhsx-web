@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>温室监控数据</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            color: #183c2b;
+            background: #f2f8f5;
+        }
+
+        .topbar {
+            padding: 22px 40px;
+            color: white;
+            background: #116b47;
+        }
+
+        .topbar h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .topbar p {
+            margin: 0;
+            color: #cceee0;
+            font-size: 14px;
+        }
+
+        .page {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 28px 22px 44px;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            padding: 10px 14px;
+            border-radius: 6px;
+            color: #116b47;
+            background: #e9f7f0;
+            font-size: 14px;
+            border-left: 4px solid #16b777;
+        }
+
+        .status.error {
+            color: #9f1239;
+            background: #ffe4e6;
+            border-color: #e11d48;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        a {
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+            border-radius: 6px;
+            color: white;
+            background: #16b777;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        a:hover {
+            background: #129963;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .card {
+            min-height: 142px;
+            padding: 22px;
+            border: 1px solid #d7e8df;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 12px 28px rgba(17, 107, 71, 0.08);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .name {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .tag {
+            color: #6b7c72;
+            font-size: 13px;
+        }
+
+        .value {
+            color: #116b47;
+            font-size: 34px;
+            font-weight: 700;
+        }
+
+        .unit {
+            margin-left: 4px;
+            color: #6b7c72;
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        .error-text {
+            margin-top: 10px;
+            color: #9f1239;
+            font-size: 13px;
+        }
+
+        @media (max-width: 860px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 560px) {
+            .topbar {
+                padding: 20px 22px;
+            }
+
+            .toolbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <h1>温室环境监控</h1>
+        <p>设备 ID：{{ device_id }}，数据来源：NLECloud 物联网云平台</p>
+    </header>
+
+    <main class="page">
+        <section class="toolbar">
+            {% if has_error %}
+            <div class="status error">部分数据获取失败，请检查 API 密钥、设备在线状态或传感器标识。</div>
+            {% else %}
+            <div class="status">云平台数据获取成功。</div>
+            {% endif %}
+
+            <div class="actions">
+                <a href="{{ url_for('cloud_login') }}">云平台授权</a>
+                <a href="{{ url_for('dashboard') }}">刷新数据</a>
+                <a href="{{ url_for('success') }}">返回成功页</a>
+            </div>
+        </section>
+
+        <section class="grid">
+            {% for sensor in sensors %}
+            <article class="card">
+                <div class="card-header">
+                    <div class="name">{{ sensor.name }}</div>
+                    <div class="tag">{{ sensor.tag }}</div>
+                </div>
+
+                <div class="value">
+                    {{ sensor.value }}
+                    {% if sensor.unit %}
+                    <span class="unit">{{ sensor.unit }}</span>
+                    {% endif %}
+                </div>
+
+                {% if sensor.error %}
+                <div class="error-text">{{ sensor.error }}</div>
+                {% endif %}
+            </article>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+</html>
