@@ -17,28 +17,32 @@
             justify-content: center;
             padding: 36px 20px;
             font-family: "Microsoft YaHei", Arial, sans-serif;
-            background: #f2f8f5;
+            color: #123c2c;
+            background:
+                radial-gradient(circle at 20% 0%, rgba(16, 185, 129, 0.16), transparent 30%),
+                linear-gradient(180deg, #f8fcfa 0%, #edf8f2 100%);
         }
 
         .box {
-            width: 430px;
+            width: 560px;
             max-width: 100%;
-            padding: 34px 32px;
-            border-radius: 8px;
-            background: white;
-            box-shadow: 0 24px 70px rgba(0, 45, 28, 0.18);
+            padding: 32px;
+            border: 1px solid rgba(15, 118, 82, 0.12);
+            border-radius: 22px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 255, 252, 0.96));
+            box-shadow: 0 20px 50px rgba(0, 70, 45, 0.10);
         }
 
         h1 {
             margin: 0 0 8px;
-            color: #113f2c;
+            color: #0f2f24;
             font-size: 28px;
             text-align: center;
         }
 
         .subtitle {
-            margin: 0 0 26px;
-            color: #6b7c72;
+            margin: 0 0 24px;
+            color: #6b8177;
             font-size: 14px;
             text-align: center;
             line-height: 1.7;
@@ -47,115 +51,278 @@
         .message {
             margin-bottom: 18px;
             padding: 12px 14px;
-            border-radius: 6px;
+            border-radius: 12px;
             font-size: 14px;
-            border-left: 4px solid;
+            line-height: 1.6;
         }
 
         .message.error {
             color: #9f1239;
             background: #ffe4e6;
-            border-color: #e11d48;
         }
 
         .message.success {
-            color: #116b47;
-            background: #e9f7f0;
-            border-color: #16b777;
+            color: #0f7049;
+            background: rgba(16, 185, 129, 0.10);
+        }
+
+        .authorized-panel {
+            padding: 22px;
+            border: 1px solid rgba(15, 118, 82, 0.12);
+            border-radius: 18px;
+            background: rgba(248, 252, 250, 0.86);
+        }
+
+        .authorized-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .authorized-title h2 {
+            margin: 0;
+            color: #0f2f24;
+            font-size: 22px;
+        }
+
+        .badge {
+            height: 26px;
+            padding: 0 11px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            color: #0f8f5d;
+            background: rgba(16, 185, 129, 0.12);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .auth-grid {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .auth-row {
+            min-height: 44px;
+            padding: 0 14px;
+            border: 1px solid rgba(15, 118, 82, 0.10);
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            align-items: center;
+            background: #ffffff;
+        }
+
+        .auth-label {
+            color: #6b8177;
+            font-size: 14px;
+        }
+
+        .auth-value {
+            color: #123c2c;
+            font-size: 14px;
+            font-weight: 800;
+            word-break: break-all;
         }
 
         .form-group {
-            margin-bottom: 18px;
+            margin-bottom: 16px;
         }
 
         label {
             display: block;
             margin-bottom: 8px;
-            color: #254d3a;
+            color: #315f4c;
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         input {
             width: 100%;
             height: 46px;
             padding: 0 14px;
-            border: 1px solid #d7e8df;
-            border-radius: 6px;
+            border: 1px solid #dceee6;
+            border-radius: 12px;
             outline: none;
-            color: #183c2b;
+            color: #123c2c;
             background: #f8fcfa;
             font-size: 15px;
         }
 
         input:focus {
-            border-color: #16b777;
+            border-color: #10b981;
             background: white;
-            box-shadow: 0 0 0 4px rgba(22, 183, 119, 0.13);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.13);
         }
 
         .button-row {
             display: flex;
-            gap: 14px;
-            margin-top: 10px;
+            gap: 12px;
+            margin-top: 16px;
         }
 
         button,
         a {
             flex: 1;
             height: 44px;
+            border: none;
+            border-radius: 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f7049;
+            background: #e8f8ef;
+            font-size: 14px;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        button,
+        .primary {
+            color: white;
+            background: linear-gradient(135deg, #10b981, #0f8f5d);
+            box-shadow: 0 16px 30px rgba(16, 185, 129, 0.22);
+        }
+
+        .danger {
+            color: #b42318;
+            background: #ffe4e6;
+        }
+
+        button:hover,
+        a:hover {
+            transform: translateY(-2px);
+        }
+
+        .modal-mask {
+            position: fixed;
+            inset: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            text-decoration: none;
-            cursor: pointer;
+            padding: 24px;
+            background: rgba(2, 44, 34, 0.28);
+            backdrop-filter: blur(8px);
+            z-index: 20;
         }
 
-        button {
-            color: white;
-            background: #16b777;
+        .modal {
+            width: 420px;
+            max-width: 100%;
+            padding: 26px;
+            border-radius: 22px;
+            background: white;
+            box-shadow: 0 30px 80px rgba(0, 50, 35, 0.24);
+            text-align: center;
         }
 
-        button:hover {
-            background: #129963;
+        .modal h2 {
+            margin: 0 0 10px;
+            color: #0f2f24;
+            font-size: 24px;
         }
 
-        a {
-            color: #116b47;
-            background: #e9f7f0;
+        .modal p {
+            margin: 0 0 20px;
+            color: #6b8177;
+            line-height: 1.7;
+            font-size: 14px;
         }
 
-        a:hover {
-            background: #d8f1e6;
+        @media (max-width: 560px) {
+            .button-row {
+                flex-direction: column;
+            }
+
+            .auth-row {
+                grid-template-columns: 1fr;
+                gap: 4px;
+                padding: 10px 14px;
+            }
         }
     </style>
 </head>
 <body>
-    <form class="box" method="post">
+    {% if auth_info.authorized and not switch_mode %}
+    <div class="modal-mask">
+        <div class="modal">
+            <h2>已完成云平台授权</h2>
+            <p>当前账号已经获取 AccessToken，可以直接返回系统首页查看传感器数据。</p>
+            <div class="button-row">
+                <a class="primary" href="{{ url_for('home') }}">返回系统</a>
+                <a href="{{ url_for('cloud_login', switch=1) }}">切换授权</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="box">
         <h1>云平台授权</h1>
-        <p class="subtitle">根据 NLECloud 文档，先用账号密码登录获取 AccessToken，再请求设备数据。</p>
+        <p class="subtitle">使用 NLECloud 账号密码获取 AccessToken，用于读取设备传感器数据。</p>
 
         {% if message %}
         <div class="message {{ message_type }}">{{ message }}</div>
         {% endif %}
 
-        <div class="form-group">
-            <label for="account">NLECloud 账号</label>
-            <input id="account" name="account" placeholder="请输入云平台账号" autocomplete="username">
-        </div>
+        {% if auth_info.authorized and not switch_mode %}
+        <section class="authorized-panel">
+            <div class="authorized-title">
+                <h2>授权信息</h2>
+                <span class="badge">已授权</span>
+            </div>
 
-        <div class="form-group">
-            <label for="password">NLECloud 密码</label>
-            <input id="password" name="password" type="password" placeholder="请输入云平台密码" autocomplete="current-password">
-        </div>
+            <div class="auth-grid">
+                <div class="auth-row">
+                    <div class="auth-label">云平台账号</div>
+                    <div class="auth-value">{{ auth_info.account }}</div>
+                </div>
+                <div class="auth-row">
+                    <div class="auth-label">设备 ID</div>
+                    <div class="auth-value">{{ auth_info.device_id }}</div>
+                </div>
+                <div class="auth-row">
+                    <div class="auth-label">授权时间</div>
+                    <div class="auth-value">{{ auth_info.authorized_at }}</div>
+                </div>
+                <div class="auth-row">
+                    <div class="auth-label">Token 摘要</div>
+                    <div class="auth-value">{{ auth_info.token_preview }}</div>
+                </div>
+            </div>
 
-        <div class="button-row">
-            <button type="submit">获取 Token</button>
-            <a href="{{ url_for('home') }}">返回系统</a>
-        </div>
-    </form>
+            <div class="button-row">
+                <a class="primary" href="{{ url_for('home') }}">查看传感器</a>
+                <a href="{{ url_for('cloud_login', switch=1) }}">切换授权</a>
+                <a class="danger" href="{{ url_for('cloud_logout') }}">退出授权</a>
+            </div>
+        </section>
+        {% else %}
+        <form method="post">
+            {% if switch_mode %}
+            <div class="message success">正在切换云平台授权，请输入新的 NLECloud 账号和密码。</div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="account">NLECloud 账号</label>
+                <input id="account" name="account" placeholder="请输入云平台账号" autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">NLECloud 密码</label>
+                <input id="password" name="password" type="password" placeholder="请输入云平台密码" autocomplete="current-password">
+            </div>
+
+            <div class="button-row">
+                <button type="submit">{{ '切换授权' if switch_mode else '获取 Token' }}</button>
+                <a href="{{ url_for('home') }}">返回系统</a>
+            </div>
+        </form>
+        {% endif %}
+    </div>
 </body>
 </html>

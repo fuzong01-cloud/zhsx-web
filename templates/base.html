@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}系统主界面{% endblock %}</title>
+    <title>{% block title %}系统首页{% endblock %}</title>
     <style>
         * {
             box-sizing: border-box;
@@ -13,8 +13,12 @@
             margin: 0;
             min-height: 100vh;
             font-family: "Microsoft YaHei", Arial, sans-serif;
-            color: #183c2b;
-            background: #f2f8f5;
+            color: #123c2c;
+            background: #f4fbf7;
+        }
+
+        a {
+            text-decoration: none;
         }
 
         .layout {
@@ -24,94 +28,500 @@
 
         .sidebar {
             width: 240px;
-            padding: 28px 20px;
-            color: white;
-            background: #116b47;
+            flex: 0 0 240px;
+            min-height: 100vh;
+            padding: 28px 18px;
+            color: #ffffff;
+            overflow: hidden;
+            position: relative;
+            background:
+                radial-gradient(circle at 20% 0%, rgba(34, 197, 94, 0.22), transparent 28%),
+                linear-gradient(180deg, #043927 0%, #064e3b 55%, #022c22 100%);
+            box-shadow: 8px 0 30px rgba(0, 50, 35, 0.22);
         }
 
-        .logo {
+        .logo-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             margin-bottom: 34px;
-            font-size: 22px;
-            font-weight: 700;
-            line-height: 1.4;
+            position: relative;
+            z-index: 1;
         }
 
-        .menu {
-            display: grid;
-            gap: 10px;
+        .logo-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 16px;
+            position: relative;
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.28), rgba(255, 255, 255, 0.10));
+            box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.08);
         }
 
-        .menu a {
-            display: block;
-            padding: 12px 14px;
-            border-radius: 6px;
-            color: #dcfce7;
-            text-decoration: none;
+        .logo-icon::before,
+        .logo-icon::after {
+            content: "";
+            position: absolute;
+            background: #8df0b5;
+            border-radius: 100% 0 100% 0;
+            transform: rotate(-35deg);
+        }
+
+        .logo-icon::before {
+            width: 16px;
+            height: 24px;
+            left: 13px;
+            top: 10px;
+        }
+
+        .logo-icon::after {
+            width: 10px;
+            height: 16px;
+            left: 25px;
+            top: 20px;
+            opacity: 0.75;
+        }
+
+        .logo-title {
+            font-size: 21px;
+            font-weight: 800;
+            line-height: 1.35;
+            letter-spacing: 0.3px;
+        }
+
+        .logo-subtitle {
+            margin-top: 5px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.68);
+        }
+
+        .nav-menu {
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-item {
+            height: 50px;
+            margin-bottom: 10px;
+            padding: 0 16px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            color: rgba(255, 255, 255, 0.86);
             font-size: 15px;
+            font-weight: 600;
+            position: relative;
+            transition: all 0.25s ease;
         }
 
-        .menu a.active,
-        .menu a:hover {
-            color: white;
-            background: rgba(255, 255, 255, 0.16);
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.10);
+            transform: translateX(3px);
+        }
+
+        .nav-item.active {
+            color: #ffffff;
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.98), rgba(16, 185, 129, 0.42));
+            box-shadow:
+                0 12px 24px rgba(0, 0, 0, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        }
+
+        .nav-item.active::after {
+            content: "";
+            position: absolute;
+            right: 0;
+            top: 11px;
+            width: 4px;
+            height: 28px;
+            border-radius: 999px;
+            background: #ffffff;
+        }
+
+        .nav-icon {
+            width: 22px;
+            height: 22px;
+            flex: 0 0 22px;
+            position: relative;
+            color: currentColor;
+        }
+
+        .nav-home::before {
+            content: "";
+            position: absolute;
+            width: 15px;
+            height: 13px;
+            left: 3px;
+            top: 7px;
+            border: 2px solid currentColor;
+            border-top: 0;
+            border-radius: 2px;
+        }
+
+        .nav-home::after {
+            content: "";
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            left: 5px;
+            top: 1px;
+            border-left: 2px solid currentColor;
+            border-top: 2px solid currentColor;
+            transform: rotate(45deg);
+        }
+
+        .nav-user::before {
+            content: "";
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            left: 7px;
+            top: 2px;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+        }
+
+        .nav-user::after {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 8px;
+            left: 3px;
+            bottom: 1px;
+            border: 2px solid currentColor;
+            border-radius: 12px 12px 2px 2px;
+        }
+
+        .nav-cloud::before {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 11px;
+            left: 2px;
+            top: 8px;
+            border: 2px solid currentColor;
+            border-radius: 12px;
+        }
+
+        .nav-cloud::after {
+            content: "";
+            position: absolute;
+            width: 9px;
+            height: 9px;
+            left: 6px;
+            top: 3px;
+            border: 2px solid currentColor;
+            border-bottom: 0;
+            border-radius: 50% 50% 0 0;
+        }
+
+        .nav-device::before {
+            content: "";
+            position: absolute;
+            inset: 3px 2px;
+            border: 2px solid currentColor;
+            border-radius: 5px;
+        }
+
+        .nav-device::after {
+            content: "";
+            position: absolute;
+            left: 7px;
+            right: 7px;
+            top: 10px;
+            height: 2px;
+            background: currentColor;
+            box-shadow: 0 5px 0 currentColor;
+        }
+
+        .sidebar-footer {
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            bottom: 28px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .sidebar-footer p {
+            margin: 0 0 4px;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .sidebar-footer span {
+            color: rgba(255, 255, 255, 0.50);
+            font-size: 11px;
+        }
+
+        .greenhouse-line {
+            height: 42px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(141, 240, 181, 0.28);
+            border-radius: 12px 12px 4px 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .greenhouse-line::before {
+            content: "";
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            top: -22px;
+            height: 52px;
+            border: 1px solid rgba(141, 240, 181, 0.25);
+            border-radius: 50% 50% 0 0;
+        }
+
+        .greenhouse-line::after {
+            content: "";
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 9px;
+            height: 1px;
+            background: rgba(141, 240, 181, 0.20);
+            box-shadow: 18px -10px 0 rgba(141, 240, 181, 0.18), 42px -3px 0 rgba(141, 240, 181, 0.16);
         }
 
         .main {
             flex: 1;
             min-width: 0;
-            display: flex;
-            flex-direction: column;
+            min-height: 100vh;
+            position: relative;
+            background:
+                radial-gradient(circle at 12% 0%, rgba(16, 185, 129, 0.16), transparent 32%),
+                radial-gradient(circle at 90% 10%, rgba(34, 197, 94, 0.10), transparent 28%),
+                linear-gradient(180deg, #f8fcfa 0%, #edf8f2 100%);
+        }
+
+        .main::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(16, 185, 129, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.04) 1px, transparent 1px);
+            background-size: 32px 32px;
+            opacity: 0.45;
+        }
+
+        .topbar,
+        .content {
+            position: relative;
+            z-index: 1;
         }
 
         .topbar {
-            height: 72px;
+            min-height: 78px;
+            padding: 16px 34px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 32px;
-            border-bottom: 1px solid #d7e8df;
-            background: white;
+            gap: 20px;
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(15, 118, 82, 0.10);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .topbar h1 {
             margin: 0;
-            color: #113f2c;
-            font-size: 22px;
+            color: #0f2f24;
+            font-size: 25px;
+            font-weight: 800;
         }
 
-        .logout {
-            padding: 9px 14px;
-            border-radius: 6px;
+        .breadcrumb {
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #7c9188;
+            font-size: 13px;
+        }
+
+        .breadcrumb-home {
+            width: 14px;
+            height: 14px;
+            position: relative;
+            display: inline-block;
+            color: currentColor;
+        }
+
+        .breadcrumb-home::before {
+            content: "";
+            position: absolute;
+            left: 2px;
+            top: 6px;
+            width: 10px;
+            height: 7px;
+            border: 1.5px solid currentColor;
+            border-top: 0;
+            border-radius: 1px;
+        }
+
+        .breadcrumb-home::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 8px;
+            height: 8px;
+            border-left: 1.5px solid currentColor;
+            border-top: 1.5px solid currentColor;
+            transform: rotate(45deg);
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logout-btn {
+            height: 42px;
+            padding: 0 20px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #10b981, #0f8f5d);
             color: white;
-            background: #16b777;
-            text-decoration: none;
             font-size: 14px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 14px 28px rgba(16, 185, 129, 0.28);
+            transition: all 0.25s ease;
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 34px rgba(16, 185, 129, 0.34);
+        }
+
+        .user-pill {
+            height: 42px;
+            padding: 0 14px 0 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(15, 118, 82, 0.10);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #315f4c;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .user-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #e8f8ef;
+            position: relative;
+        }
+
+        .user-dot::before {
+            content: "";
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            left: 9px;
+            top: 6px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .user-dot::after {
+            content: "";
+            position: absolute;
+            width: 14px;
+            height: 7px;
+            left: 6px;
+            bottom: 5px;
+            border-radius: 12px 12px 4px 4px;
+            background: #10b981;
         }
 
         .content {
-            flex: 1;
-            padding: 32px;
+            padding: 28px 32px 42px;
         }
 
-        @media (max-width: 720px) {
+        .section-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 255, 252, 0.96));
+            border: 1px solid rgba(15, 118, 82, 0.12);
+            border-radius: 22px;
+            box-shadow: 0 20px 50px rgba(0, 70, 45, 0.10);
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 768px) {
             .layout {
                 flex-direction: column;
             }
 
             .sidebar {
                 width: 100%;
+                flex-basis: auto;
+                min-height: auto;
+                padding: 22px;
+            }
+
+            .sidebar-footer {
+                position: static;
+                margin-top: 20px;
+            }
+
+            .nav-menu {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .nav-item {
+                margin-bottom: 0;
             }
 
             .topbar {
-                height: auto;
+                min-height: auto;
+                padding: 18px 22px;
                 align-items: flex-start;
                 flex-direction: column;
-                gap: 12px;
-                padding: 20px;
+                gap: 14px;
+            }
+
+            .top-actions {
+                width: 100%;
+                justify-content: space-between;
             }
 
             .content {
                 padding: 22px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .nav-menu {
+                grid-template-columns: 1fr;
+            }
+
+            .top-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .logout-btn,
+            .user-pill {
+                width: 100%;
+                justify-content: center;
             }
         }
     </style>
@@ -120,25 +530,66 @@
 <body>
     <div class="layout">
         <aside class="sidebar">
-            <div class="logo">温室环境监控<br>Web 系统</div>
-            <nav class="menu">
-                <a class="active" href="{{ url_for('home') }}">系统首页</a>
-                <a href="#">个人信息</a>
-                <a href="{{ url_for('cloud_login') }}">云平台授权</a>
-                <a href="#">设备管理</a>
+            <div class="logo-box">
+                <div class="logo-icon"></div>
+                <div>
+                    <div class="logo-title">温室环境监控<br>Web 系统</div>
+                    <div class="logo-subtitle">Greenhouse Monitor</div>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a class="nav-item {{ 'active' if request.endpoint == 'home' else '' }}" href="{{ url_for('home') }}">
+                    <span class="nav-icon nav-home"></span>
+                    <span>系统首页</span>
+                </a>
+                <a class="nav-item {{ 'active' if request.endpoint == 'profile' else '' }}" href="{{ url_for('profile') }}">
+                    <span class="nav-icon nav-user"></span>
+                    <span>个人信息</span>
+                </a>
+                <a class="nav-item {{ 'active' if request.endpoint == 'cloud_login' else '' }}" href="{{ url_for('cloud_login') }}">
+                    <span class="nav-icon nav-cloud"></span>
+                    <span>云平台授权</span>
+                </a>
+                <a class="nav-item" href="{{ url_for('home') }}">
+                    <span class="nav-icon nav-device"></span>
+                    <span>设备管理</span>
+                </a>
             </nav>
+
+            <div class="sidebar-footer">
+                <div class="greenhouse-line"></div>
+                <p>Smart Agriculture Platform</p>
+                <span>Greenhouse IoT Dashboard</span>
+            </div>
         </aside>
 
-        <section class="main">
+        <main class="main">
             <header class="topbar">
-                <h1>{% block page_title %}系统主界面{% endblock %}</h1>
-                <a class="logout" href="{{ url_for('logout') }}">退出登录</a>
+                <div>
+                    <h1>{% block page_title %}系统首页{% endblock %}</h1>
+                    <div class="breadcrumb">
+                        <span class="breadcrumb-home"></span>
+                        <span>首页</span>
+                        <span>/</span>
+                        <span>Dashboard</span>
+                    </div>
+                </div>
+
+                <div class="top-actions">
+                    <a class="logout-btn" href="{{ url_for('logout') }}">退出登录</a>
+                    <div class="user-pill">
+                        <span class="user-dot"></span>
+                        <span>{{ current_user.name if current_user else '用户' }}</span>
+                        <span>⌄</span>
+                    </div>
+                </div>
             </header>
 
-            <main class="content">
+            <section class="content">
                 {% block content %}{% endblock %}
-            </main>
-        </section>
+            </section>
+        </main>
     </div>
 </body>
 </html>

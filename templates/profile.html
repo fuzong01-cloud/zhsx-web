@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}修改个人信息{% endblock %}
+{% block page_title %}修改个人信息{% endblock %}
+
+{% block head %}
+<style>
+    .profile-editor {
+        padding: 30px;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        gap: 30px;
+        align-items: start;
+    }
+
+    .avatar-panel {
+        text-align: center;
+    }
+
+    .avatar-preview {
+        width: 180px;
+        height: 180px;
+        margin: 0 auto 18px;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid rgba(15, 118, 82, 0.12);
+        background: #f4fbf7;
+        box-shadow: 0 16px 34px rgba(0, 70, 45, 0.12);
+    }
+
+    .avatar-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .avatar-panel h2 {
+        margin: 0 0 8px;
+        color: #0f2f24;
+        font-size: 22px;
+    }
+
+    .avatar-panel p {
+        margin: 0;
+        color: #6b8177;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+
+    .form-panel {
+        min-width: 0;
+    }
+
+    .message {
+        margin-bottom: 18px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        font-size: 14px;
+        border-left: 4px solid;
+    }
+
+    .message.error {
+        color: #9f1239;
+        background: #ffe4e6;
+        border-color: #e11d48;
+    }
+
+    .message.success {
+        color: #0f7049;
+        background: rgba(16, 185, 129, 0.10);
+        border-color: #10b981;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .form-group.full {
+        grid-column: 1 / -1;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        color: #254d3a;
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    input {
+        width: 100%;
+        height: 46px;
+        padding: 0 13px;
+        border: 1px solid rgba(15, 118, 82, 0.14);
+        border-radius: 12px;
+        outline: none;
+        color: #123c2c;
+        background: rgba(248, 252, 250, 0.92);
+        font-size: 15px;
+    }
+
+    input[type="file"] {
+        height: auto;
+        padding: 11px 13px;
+    }
+
+    input:focus {
+        border-color: #10b981;
+        background: #ffffff;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.13);
+    }
+
+    .readonly-input {
+        color: #6b8177;
+        background: #eef7f2;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .save-btn,
+    .back-btn {
+        height: 46px;
+        padding: 0 24px;
+        border: none;
+        border-radius: 13px;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .save-btn {
+        color: #ffffff;
+        background: linear-gradient(135deg, #10b981, #0f8f5d);
+        box-shadow: 0 16px 30px rgba(16, 185, 129, 0.26);
+    }
+
+    .back-btn {
+        color: #116b47;
+        background: #e9f7f0;
+    }
+
+    @media (max-width: 900px) {
+        .profile-editor {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .profile-editor {
+            padding: 22px;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .button-row {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="profile-editor section-card">
+    <aside class="avatar-panel">
+        <div class="avatar-preview">
+            <img src="{{ user.avatar }}" alt="个人照片">
+        </div>
+        <h2>{{ user.name }}</h2>
+        <p>用户名：{{ username }}<br>可修改姓名、学号、密码和个人照片。</p>
+    </aside>
+
+    <form class="form-panel" method="post" enctype="multipart/form-data">
+        {% if message %}
+        <div class="message {{ message_type }}">{{ message }}</div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input class="readonly-input" id="username" value="{{ username }}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="student_id">学号</label>
+                <input id="student_id" name="student_id" value="{{ user.student_id }}" required>
+            </div>
+
+            <div class="form-group full">
+                <label for="name">姓名</label>
+                <input id="name" name="name" value="{{ user.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">新密码</label>
+                <input id="password" name="password" type="password" placeholder="不修改请留空">
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">确认新密码</label>
+                <input id="confirm_password" name="confirm_password" type="password" placeholder="再次输入新密码">
+            </div>
+
+            <div class="form-group full">
+                <label for="photo">更换个人照片</label>
+                <input id="photo" name="photo" type="file" accept="image/*">
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button class="save-btn" type="submit">保存修改</button>
+            <a class="back-btn" href="{{ url_for('home') }}">返回首页</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -5,232 +5,802 @@
 
 {% block head %}
 <style>
-    .panel {
-        margin-bottom: 24px;
-        padding: 24px;
-        border: 1px solid #d7e8df;
-        border-radius: 8px;
-        background: white;
-        box-shadow: 0 14px 34px rgba(17, 107, 71, 0.08);
-    }
-
-    .profile {
+    .welcome-card {
+        padding: 34px 36px;
         display: grid;
-        grid-template-columns: 1fr 260px;
-        gap: 24px;
-        align-items: stretch;
+        grid-template-columns: minmax(0, 1.45fr) 360px;
+        gap: 34px;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
     }
 
-    .profile h2,
-    .panel h2 {
-        margin: 0 0 18px;
-        color: #113f2c;
-        font-size: 24px;
+    .welcome-card::before {
+        content: "";
+        position: absolute;
+        width: 340px;
+        height: 340px;
+        right: 160px;
+        top: -180px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.16), transparent 65%);
+        pointer-events: none;
     }
 
-    .info-row {
+    .welcome-info,
+    .plant-panel {
+        position: relative;
+        z-index: 1;
+    }
+
+    .eyebrow {
+        display: inline-flex;
+        padding: 6px 12px;
+        border-radius: 999px;
+        margin-bottom: 14px;
+        background: rgba(16, 185, 129, 0.10);
+        color: #0f8f5d;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+    }
+
+    .welcome-info h2 {
+        margin: 0;
+        color: #0f2f24;
+        font-size: 30px;
+        line-height: 1.25;
+        letter-spacing: -0.5px;
+    }
+
+    .welcome-info h2 span {
+        color: #0f8f5d;
+    }
+
+    .welcome-info p {
+        margin: 12px 0 24px;
+        color: #6b8177;
+        font-size: 15px;
+        line-height: 1.7;
+    }
+
+    .profile-list {
         display: grid;
-        grid-template-columns: 90px 1fr;
-        gap: 16px;
-        padding: 13px 0;
-        border-bottom: 1px solid #edf5f1;
-        font-size: 16px;
+        gap: 10px;
+        max-width: 650px;
     }
 
-    .info-row:last-child {
-        border-bottom: none;
+    .profile-row {
+        height: 48px;
+        padding: 0 18px;
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        align-items: center;
+        border-radius: 14px;
+        background: rgba(248, 252, 250, 0.82);
+        border: 1px solid rgba(15, 118, 82, 0.10);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
     }
 
-    .label {
-        color: #6b7c72;
+    .profile-label {
+        color: #6b8177;
+        font-size: 14px;
     }
 
-    .value {
-        color: #183c2b;
-        font-weight: 700;
+    .profile-row strong {
+        color: #123c2c;
+        font-size: 15px;
     }
 
-    .photo {
-        width: 100%;
-        height: 260px;
-        border-radius: 8px;
-        object-fit: cover;
+    .plant-panel {
+        height: 230px;
+        border-radius: 22px;
+        position: relative;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at 30% 20%, rgba(16, 185, 129, 0.22), transparent 35%),
+            linear-gradient(135deg, #f4fbf7, #e4f6ed);
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .cloud-actions {
+    .plant-panel::before {
+        content: "";
+        position: absolute;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.52);
+        right: -60px;
+        top: -60px;
+    }
+
+    .plant-panel img {
+        position: relative;
+        z-index: 1;
+        width: 80%;
+        height: 90%;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 24px rgba(0, 80, 50, 0.16));
+    }
+
+    .auth-card {
+        padding: 26px 28px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
+        gap: 24px;
     }
 
-    .status {
-        padding: 11px 14px;
-        border-radius: 6px;
-        color: #116b47;
-        background: #e9f7f0;
-        border-left: 4px solid #16b777;
+    .auth-left {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        min-width: 0;
+    }
+
+    .auth-icon {
+        width: 64px;
+        height: 64px;
+        flex: 0 0 64px;
+        border-radius: 20px;
+        background:
+            radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.75), transparent 35%),
+            linear-gradient(135deg, #d1fae5, #10b981);
+        box-shadow: 0 16px 26px rgba(16, 185, 129, 0.24);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+
+    .auth-icon::before {
+        content: "";
+        position: absolute;
+        width: 34px;
+        height: 19px;
+        border: 3px solid #ffffff;
+        border-radius: 18px;
+        border-top-color: transparent;
+        top: 24px;
+    }
+
+    .auth-icon::after {
+        content: "";
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border: 3px solid #ffffff;
+        border-bottom: 0;
+        border-radius: 50% 50% 0 0;
+        top: 17px;
+    }
+
+    .auth-content h2 {
+        margin: 0;
+        color: #0f2f24;
+        font-size: 24px;
+    }
+
+    .section-title-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .status-badge {
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .status-badge.success {
+        background: rgba(16, 185, 129, 0.12);
+        color: #0f8f5d;
+    }
+
+    .status-badge.warning {
+        background: #fff4df;
+        color: #a65f00;
+    }
+
+    .auth-message {
+        margin-top: 12px;
+        display: inline-flex;
+        padding: 10px 14px;
+        border-radius: 10px;
         font-size: 14px;
+        line-height: 1.5;
     }
 
-    .status.error {
-        color: #9f1239;
-        background: #ffe4e6;
-        border-color: #e11d48;
+    .success-message {
+        background: rgba(16, 185, 129, 0.10);
+        color: #0f7049;
     }
 
-    .button {
-        min-width: 130px;
-        height: 40px;
+    .warning-message {
+        background: #fff4df;
+        color: #a65f00;
+    }
+
+    .primary-btn {
+        height: 44px;
+        padding: 0 24px;
+        border-radius: 13px;
+        background: linear-gradient(135deg, #10b981, #0f8f5d);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 800;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0 16px;
-        border-radius: 6px;
-        color: white;
-        background: #16b777;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 700;
+        box-shadow: 0 16px 30px rgba(16, 185, 129, 0.26);
+        transition: all 0.25s ease;
+        white-space: nowrap;
     }
 
-    .button:hover {
-        background: #129963;
+    .primary-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 38px rgba(16, 185, 129, 0.34);
+    }
+
+    .sensor-section {
+        padding: 28px;
+    }
+
+    .sensor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 24px;
+        margin-bottom: 22px;
+    }
+
+    .sensor-title-box h2 {
+        position: relative;
+        margin: 0;
+        padding-left: 16px;
+        color: #0f2f24;
+        font-size: 24px;
+    }
+
+    .sensor-title-box h2::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 4px;
+        width: 4px;
+        height: 24px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #10b981, #22c55e);
+    }
+
+    .sensor-title-box p {
+        margin: 8px 0 14px;
+        color: #6b8177;
+        font-size: 14px;
+    }
+
+    .info-notice {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: #eaf5ff;
+        color: #2f80ed;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.5;
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 150px);
+        gap: 12px;
+    }
+
+    .status-card {
+        height: 76px;
+        padding: 14px;
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 255, 252, 0.92));
+        border: 1px solid rgba(15, 118, 82, 0.10);
+        box-shadow: 0 10px 22px rgba(0, 80, 50, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+
+    .status-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        background: rgba(16, 185, 129, 0.12);
+        position: relative;
+        flex: 0 0 38px;
+    }
+
+    .status-icon::after {
+        content: "";
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #10b981;
+        left: 14px;
+        top: 14px;
+    }
+
+    .status-card p {
+        margin: 0 0 4px;
+        color: #7c9188;
+        font-size: 12px;
+    }
+
+    .status-card strong {
+        color: #0f2f24;
+        font-size: 15px;
+    }
+
+    .status-card .success {
+        color: #0f8f5d;
+    }
+
+    .status-card .warning {
+        color: #f59e0b;
+    }
+
+    .status-card .danger {
+        color: #ef4444;
     }
 
     .sensor-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        gap: 18px;
     }
 
-    .sensor-card {
-        min-height: 138px;
+    .metric-card {
+        min-height: 172px;
         padding: 20px;
-        border: 1px solid #d7e8df;
-        border-radius: 8px;
-        background: #fbfefd;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 255, 252, 0.96));
+        border: 1px solid rgba(15, 118, 82, 0.12);
+        box-shadow: 0 12px 28px rgba(0, 80, 50, 0.07);
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
     }
 
-    .sensor-top {
+    .metric-card::after {
+        content: "";
+        position: absolute;
+        width: 120px;
+        height: 120px;
+        right: -62px;
+        bottom: -70px;
+        border-radius: 50%;
+        background: rgba(16, 185, 129, 0.06);
+    }
+
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 42px rgba(0, 80, 50, 0.13);
+        border-color: rgba(16, 185, 129, 0.28);
+    }
+
+    .metric-top,
+    .metric-value-row,
+    .metric-footer {
+        position: relative;
+        z-index: 1;
+    }
+
+    .metric-top {
         display: flex;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 18px;
     }
 
-    .sensor-name {
-        font-size: 16px;
-        font-weight: 700;
+    .metric-name {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
-    .sensor-tag {
-        color: #6b7c72;
+    .metric-name strong {
+        color: #123c2c;
+        font-size: 15px;
+    }
+
+    .metric-key {
+        color: #8a9d94;
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+    }
+
+    .metric-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .metric-icon.green {
+        background: rgba(16, 185, 129, 0.12);
+        color: #0f8f5d;
+    }
+
+    .metric-icon.blue {
+        background: rgba(47, 128, 237, 0.12);
+        color: #2f80ed;
+    }
+
+    .metric-icon.orange {
+        background: rgba(245, 158, 11, 0.13);
+        color: #f59e0b;
+    }
+
+    .temp-shape::before {
+        content: "";
+        width: 8px;
+        height: 22px;
+        border: 2px solid currentColor;
+        border-radius: 999px;
+        position: absolute;
+        top: 8px;
+    }
+
+    .temp-shape::after {
+        content: "";
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: currentColor;
+        position: absolute;
+        bottom: 8px;
+    }
+
+    .up-shape::before,
+    .down-shape::before {
+        content: "";
+        width: 2px;
+        height: 22px;
+        background: currentColor;
+        position: absolute;
+        top: 11px;
+    }
+
+    .up-shape::after {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-left: 2px solid currentColor;
+        border-top: 2px solid currentColor;
+        transform: rotate(45deg);
+        position: absolute;
+        top: 10px;
+    }
+
+    .down-shape::after {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(45deg);
+        position: absolute;
+        bottom: 10px;
+    }
+
+    .alarm-shape::before {
+        content: "";
+        width: 20px;
+        height: 18px;
+        border: 2px solid currentColor;
+        border-radius: 10px 10px 6px 6px;
+        position: absolute;
+        top: 12px;
+    }
+
+    .alarm-shape::after {
+        content: "";
+        width: 14px;
+        height: 2px;
+        background: currentColor;
+        position: absolute;
+        bottom: 10px;
+    }
+
+    .pressure-shape::before {
+        content: "";
+        width: 24px;
+        height: 24px;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        position: absolute;
+    }
+
+    .pressure-shape::after {
+        content: "";
+        width: 11px;
+        height: 2px;
+        background: currentColor;
+        transform: rotate(-35deg);
+        transform-origin: left center;
+        position: absolute;
+        left: 22px;
+        top: 24px;
+    }
+
+    .co2-shape {
         font-size: 13px;
+        font-weight: 900;
+        letter-spacing: -0.8px;
     }
 
-    .sensor-value {
-        color: #116b47;
-        font-size: 32px;
-        font-weight: 700;
+    .wind-shape::before {
+        content: "";
+        width: 24px;
+        height: 10px;
+        border-top: 2px solid currentColor;
+        border-radius: 999px;
+        position: absolute;
+        top: 15px;
     }
 
-    .sensor-unit {
-        margin-left: 4px;
-        color: #6b7c72;
+    .wind-shape::after {
+        content: "";
+        width: 18px;
+        height: 10px;
+        border-top: 2px solid currentColor;
+        border-radius: 999px;
+        position: absolute;
+        top: 25px;
+        left: 14px;
+    }
+
+    .metric-value-row {
+        margin-top: 26px;
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .metric-value {
+        color: #063f2c;
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+
+    .metric-unit {
+        color: #6f8b7e;
         font-size: 16px;
-        font-weight: 400;
     }
 
-    .error-text {
-        margin-top: 10px;
-        color: #9f1239;
-        font-size: 13px;
-        line-height: 1.5;
+    .metric-footer {
+        margin-top: 20px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(15, 118, 82, 0.10);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #8a9d94;
+        font-size: 12px;
+        line-height: 1.45;
     }
 
-    @media (max-width: 980px) {
-        .sensor-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    .metric-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex: 0 0 7px;
     }
 
-    @media (max-width: 720px) {
-        .profile,
-        .sensor-grid {
+    .metric-dot.success {
+        background: #10b981;
+    }
+
+    .metric-dot.warning {
+        background: #f59e0b;
+    }
+
+    .metric-dot.danger {
+        background: #ef4444;
+    }
+
+    @media (max-width: 1180px) {
+        .welcome-card {
             grid-template-columns: 1fr;
         }
 
-        .cloud-actions {
-            align-items: stretch;
+        .plant-panel {
+            height: 200px;
+        }
+
+        .sensor-header {
             flex-direction: column;
+        }
+
+        .status-grid {
+            width: 100%;
+            grid-template-columns: repeat(3, minmax(140px, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .welcome-card,
+        .sensor-section,
+        .auth-card {
+            padding: 22px;
+        }
+
+        .auth-card {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .primary-btn {
+            width: 100%;
+        }
+
+        .status-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .profile-row {
+            grid-template-columns: 80px 1fr;
+        }
+
+        .metric-value {
+            font-size: 28px;
         }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<section class="panel profile">
-    <div>
-        <h2>登录成功，欢迎进入系统</h2>
+<section class="welcome-card section-card">
+    <div class="welcome-info">
+        <div class="eyebrow">Greenhouse IoT Platform</div>
+        <h2>欢迎进入<span>温室环境监控</span> Web 系统</h2>
+        <p>实时查看温室环境数据，掌握设备运行状态，保障作物健康生长。</p>
 
-        <div class="info-row">
-            <div class="label">姓名</div>
-            <div class="value">{{ user.name }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="label">学号</div>
-            <div class="value">{{ user.student_id }}</div>
-        </div>
-
-        <div class="info-row">
-            <div class="label">用户名</div>
-            <div class="value">{{ username }}</div>
+        <div class="profile-list">
+            <div class="profile-row">
+                <span class="profile-label">姓名</span>
+                <strong>{{ user.name }}</strong>
+            </div>
+            <div class="profile-row">
+                <span class="profile-label">学号</span>
+                <strong>{{ user.student_id }}</strong>
+            </div>
+            <div class="profile-row">
+                <span class="profile-label">用户名</span>
+                <strong>{{ username }}</strong>
+            </div>
         </div>
     </div>
 
-    <img class="photo" src="{{ user.avatar }}" alt="个人照片">
-</section>
-
-<section class="panel">
-    <h2>云平台授权</h2>
-    <div class="cloud-actions">
-        {% if cloud_authorized %}
-        <div class="status">已完成 NLECloud 授权，可以读取设备 {{ device_id }} 的传感器数据。</div>
-        {% else %}
-        <div class="status error">尚未完成云平台授权，请先输入 NLECloud 账号密码获取 AccessToken。</div>
-        {% endif %}
-        <a class="button" href="{{ url_for('cloud_login') }}">云平台授权</a>
+    <div class="plant-panel">
+        <img src="{{ user.avatar }}" alt="个人照片">
     </div>
 </section>
 
-<section class="panel">
-    <h2>传感器数据</h2>
+<section class="auth-card section-card">
+    <div class="auth-left">
+        <div class="auth-icon"></div>
 
-    {% if has_error %}
-    <div class="status error" style="margin-bottom: 18px;">部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。</div>
-    {% else %}
-    <div class="status" style="margin-bottom: 18px;">传感器数据获取成功。</div>
-    {% endif %}
+        <div class="auth-content">
+            <div class="section-title-row">
+                <h2>云平台授权</h2>
+                {% if cloud_authorized %}
+                <span class="status-badge success">已授权</span>
+                {% else %}
+                <span class="status-badge warning">未授权</span>
+                {% endif %}
+            </div>
+
+            {% if cloud_authorized %}
+            <div class="auth-message success-message">已完成 NLECloud 授权，可以读取设备 {{ device_id }} 的传感器数据。</div>
+            {% else %}
+            <div class="auth-message warning-message">尚未完成云平台授权，请先输入 NLECloud 账号密码获取 AccessToken。</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <a class="primary-btn" href="{{ url_for('cloud_login') }}">{{ '重新授权' if cloud_authorized else '立即授权' }}</a>
+</section>
+
+<section class="sensor-section section-card">
+    <div class="sensor-header">
+        <div class="sensor-title-box">
+            <h2>传感器数据</h2>
+            <p>实时采集温室环境核心指标</p>
+            {% if has_error %}
+            <div class="info-notice">部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。</div>
+            {% else %}
+            <div class="info-notice">传感器数据获取成功。</div>
+            {% endif %}
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-icon"></div>
+                <div>
+                    <p>设备状态</p>
+                    <strong class="{{ 'success' if cloud_authorized else 'danger' }}">{{ '已连接' if cloud_authorized else '未连接' }}</strong>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-icon"></div>
+                <div>
+                    <p>云平台状态</p>
+                    <strong class="{{ 'success' if cloud_authorized else 'warning' }}">{{ '已授权' if cloud_authorized else '未授权' }}</strong>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-icon"></div>
+                <div>
+                    <p>数据更新时间</p>
+                    <strong>--</strong>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="sensor-grid">
         {% for sensor in sensors %}
-        <article class="sensor-card">
-            <div class="sensor-top">
-                <div class="sensor-name">{{ sensor.name }}</div>
-                <div class="sensor-tag">{{ sensor.tag }}</div>
+        <div class="metric-card">
+            <div class="metric-top">
+                <div class="metric-name">
+                    {% if sensor.icon == "alarm" %}
+                    <span class="metric-icon orange alarm-shape"></span>
+                    {% elif sensor.icon == "gauge" %}
+                    <span class="metric-icon blue pressure-shape"></span>
+                    {% elif sensor.icon == "wind" %}
+                    <span class="metric-icon blue wind-shape"></span>
+                    {% elif sensor.icon == "cloud" %}
+                    <span class="metric-icon green co2-shape">CO₂</span>
+                    {% elif sensor.tag == "upperLimit" %}
+                    <span class="metric-icon green up-shape"></span>
+                    {% elif sensor.tag == "lowerLimit" %}
+                    <span class="metric-icon green down-shape"></span>
+                    {% else %}
+                    <span class="metric-icon green temp-shape"></span>
+                    {% endif %}
+                    <strong>{{ sensor.name }}</strong>
+                </div>
+
+                <span class="metric-key">{{ sensor.tag }}</span>
             </div>
-            <div class="sensor-value">
-                {{ sensor.value }}
+
+            <div class="metric-value-row">
+                <span class="metric-value">{{ sensor.value }}</span>
                 {% if sensor.unit %}
-                <span class="sensor-unit">{{ sensor.unit }}</span>
+                <span class="metric-unit">{{ sensor.unit }}</span>
                 {% endif %}
             </div>
-            {% if sensor.error %}
-            <div class="error-text">{{ sensor.error }}</div>
-            {% endif %}
-        </article>
+
+            <div class="metric-footer">
+                <span class="metric-dot {{ 'danger' if sensor.error else 'success' }}"></span>
+                <span>{{ sensor.error if sensor.error else '数据获取正常' }}</span>
+            </div>
+        </div>
         {% endfor %}
     </div>
 </section>

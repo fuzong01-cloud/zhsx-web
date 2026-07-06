@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -18,23 +19,29 @@ NLE_DEVICE_ID = "1516155"
 NLE_API_HOST = "http://api.nlecloud.com"
 
 SENSORS = [
-    {"name": "当前温度", "tag": "currentTemp", "unit": "℃"},
-    {"name": "上限温度", "tag": "upperLimit", "unit": "℃"},
-    {"name": "下限温度", "tag": "lowerLimit", "unit": "℃"},
-    {"name": "温度报警", "tag": "alarm", "unit": ""},
-    {"name": "大气压力", "tag": "m_pressure", "unit": "hPa"},
-    {"name": "二氧化碳", "tag": "m_co2", "unit": "ppm"},
-    {"name": "风速", "tag": "m_wind_speed", "unit": "m/s"},
+    {"name": "当前温度", "tag": "currentTemp", "unit": "℃", "icon": "thermometer"},
+    {"name": "上限温度", "tag": "upperLimit", "unit": "℃", "icon": "thermometer"},
+    {"name": "下限温度", "tag": "lowerLimit", "unit": "℃", "icon": "thermometer"},
+    {"name": "温度报警", "tag": "alarm", "unit": "", "icon": "alarm"},
+    {"name": "大气压力", "tag": "m_pressure", "unit": "hPa", "icon": "gauge"},
+    {"name": "二氧化碳", "tag": "m_co2", "unit": "ppm", "icon": "cloud"},
+    {"name": "风速", "tag": "m_wind_speed", "unit": "m/s", "icon": "wind"},
 ]
 
 USERS = {
     "15600002034": {
         "password": "123456",
-        "name": "张三",
-        "student_id": "20230741241",
+        "name": "王鹏飞",
+        "student_id": "202320741241",
         "avatar": "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80",
     }
 }
+
+
+@app.context_processor
+def inject_current_user():
+    username = session.get("username")
+    return {"current_user": USERS.get(username) if username else None}
 
 
 def is_valid_username(username):
@@ -126,12 +133,24 @@ def build_sensor_data():
                 "name": sensor["name"],
                 "tag": sensor["tag"],
                 "unit": sensor["unit"],
+                "icon": sensor["icon"],
                 "value": result["value"],
                 "error": result["error"],
             }
         )
 
     return sensor_data, has_error
+
+
+def get_cloud_auth_info():
+    token = session.get("nle_access_token", "")
+    return {
+        "authorized": bool(token),
+        "account": session.get("nle_account", "--"),
+        "device_id": NLE_DEVICE_ID,
+        "authorized_at": session.get("nle_authorized_at", "--"),
+        "token_preview": f"{token[:6]}...{token[-6:]}" if len(token) > 12 else "--",
+    }
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -216,7 +235,58 @@ def home():
         device_id=NLE_DEVICE_ID,
         sensors=sensors,
         has_error=has_error,
+        updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         cloud_authorized=bool(session.get("nle_access_token")),
+    )
+
+
+@app.route("/profile", methods=["GET", "POST"])
+def profile():
+    username = session.get("username")
+    if not username:
+        return redirect(url_for("login"))
+
+    user = USERS[username]
+    message = ""
+    message_type = ""
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        student_id = request.form.get("student_id", "").strip()
+        password = request.form.get("password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+        photo = request.files.get("photo")
+
+        if not name or not student_id:
+            message = "姓名和学号不能为空。"
+            message_type = "error"
+        elif password and password != confirm_password:
+            message = "两次输入的密码不一致。"
+            message_type = "error"
+        elif photo and photo.filename and not allowed_photo(photo.filename):
+            message = "照片格式仅支持 jpg、png、gif、webp。"
+            message_type = "error"
+        else:
+            user["name"] = name
+            user["student_id"] = student_id
+
+            if password:
+                user["password"] = password
+
+            if photo and photo.filename:
+                filename = secure_filename(f"{username}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}")
+                photo.save(UPLOAD_DIR / filename)
+                user["avatar"] = url_for("static", filename=f"uploads/{filename}")
+
+            message = "个人信息修改成功。"
+            message_type = "success"
+
+    return render_template(
+        "profile.html",
+        username=username,
+        user=user,
+        message=message,
+        message_type=message_type,
     )
 
 
@@ -225,8 +295,9 @@ def cloud_login():
     if not session.get("username"):
         return redirect(url_for("login"))
 
-    message = ""
-    message_type = ""
+    message = "当前已完成云平台授权。" if session.get("nle_access_token") else ""
+    message_type = "success" if message else ""
+    switch_mode = request.args.get("switch") == "1"
 
     if request.method == "POST":
         account = request.form.get("account", "").strip()
@@ -242,10 +313,27 @@ def cloud_login():
                 message_type = "error"
             else:
                 session["nle_access_token"] = token
+                session["nle_account"] = account
+                session["nle_authorized_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 message = "云平台授权成功，可以查看传感器数据。"
                 message_type = "success"
+                switch_mode = False
 
-    return render_template("cloud_login.html", message=message, message_type=message_type)
+    return render_template(
+        "cloud_login.html",
+        message=message,
+        message_type=message_type,
+        auth_info=get_cloud_auth_info(),
+        switch_mode=switch_mode,
+    )
+
+
+@app.route("/cloud-logout")
+def cloud_logout():
+    session.pop("nle_access_token", None)
+    session.pop("nle_account", None)
+    session.pop("nle_authorized_at", None)
+    return redirect(url_for("cloud_login"))
 
 
 @app.route("/logout")
