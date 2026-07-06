@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧农业系统登录</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+
+        .login {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            background:
+                linear-gradient(135deg, rgba(8, 88, 56, 0.88), rgba(22, 183, 119, 0.72)),
+                url("https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1600&q=80")
+                center / cover no-repeat;
+        }
+
+        .login-box {
+            width: 900px;
+            min-height: 520px;
+            display: flex;
+            border-radius: 24px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 28px 80px rgba(0, 45, 28, 0.38);
+        }
+
+        .login-left {
+            width: 45%;
+            padding: 52px 42px;
+            color: white;
+            background:
+                linear-gradient(160deg, rgba(17, 107, 71, 0.96), rgba(22, 183, 119, 0.9)),
+                url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80")
+                center / cover no-repeat;
+            position: relative;
+        }
+
+        .login-left::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 40, 25, 0.35));
+        }
+
+        .left-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .system-badge {
+            display: inline-block;
+            padding: 8px 14px;
+            margin-bottom: 28px;
+            border-radius: 999px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(6px);
+        }
+
+        .login-left h1 {
+            margin: 0 0 18px;
+            font-size: 34px;
+            line-height: 1.3;
+            letter-spacing: 1px;
+        }
+
+        .login-left p {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.9;
+            opacity: 0.92;
+        }
+
+        .feature-list {
+            margin-top: 42px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 15px;
+        }
+
+        .feature-icon {
+            width: 28px;
+            height: 28px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: #116b47;
+            background: rgba(255, 255, 255, 0.9);
+            font-weight: bold;
+        }
+
+        .login-right {
+            width: 55%;
+            padding: 58px 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .login-title {
+            margin-bottom: 34px;
+        }
+
+        .login-title h2 {
+            margin: 0 0 10px;
+            color: #113f2c;
+            font-size: 30px;
+            font-weight: 700;
+        }
+
+        .login-title p {
+            margin: 0;
+            color: #6b7c72;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #254d3a;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .input-box {
+            position: relative;
+        }
+
+        .input-box span {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #16b777;
+            font-size: 17px;
+        }
+
+        input {
+            width: 100%;
+            height: 48px;
+            padding: 0 14px 0 44px;
+            border: 1px solid #d7e8df;
+            border-radius: 12px;
+            outline: none;
+            color: #183c2b;
+            background: #f8fcfa;
+            font-size: 15px;
+            transition: 0.25s;
+        }
+
+        input::placeholder {
+            color: #9aaca2;
+        }
+
+        input:focus {
+            border-color: #16b777;
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(22, 183, 119, 0.13);
+        }
+
+        .button-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 10px;
+        }
+
+        button {
+            flex: 1;
+            height: 46px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.25s;
+        }
+
+        button[type="submit"] {
+            color: white;
+            background: linear-gradient(135deg, #16b777, #0f8e5b);
+            box-shadow: 0 10px 22px rgba(22, 183, 119, 0.28);
+        }
+
+        button[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(22, 183, 119, 0.35);
+        }
+
+        button[type="reset"] {
+            color: #116b47;
+            background: #e9f7f0;
+        }
+
+        button[type="reset"]:hover {
+            background: #d8f1e6;
+        }
+
+        .message {
+            margin: 22px 0 0;
+            padding: 12px 14px;
+            border-radius: 10px;
+            color: #116b47;
+            background: #e9f7f0;
+            font-size: 14px;
+            border-left: 4px solid #16b777;
+        }
+
+        .footer-tip {
+            margin-top: 26px;
+            text-align: center;
+            color: #8a9b91;
+            font-size: 13px;
+        }
+
+        @media (max-width: 760px) {
+            .login-box {
+                width: 100%;
+                flex-direction: column;
+            }
+
+            .login-left {
+                width: 100%;
+                padding: 36px 28px;
+            }
+
+            .login-left h1 {
+                font-size: 28px;
+            }
+
+            .login-right {
+                width: 100%;
+                padding: 38px 28px;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body class="login">
+    <div class="login-box">
+
+        <div class="login-left">
+            <div class="left-content">
+                <div class="system-badge">Agri-IoT Platform</div>
+
+                <h1>智慧农业<br>环境监测系统</h1>
+
+                <p>
+                    面向温室环境监测、传感器数据管理和设备智能控制，
+                    实现农业生产过程的数字化、可视化与自动化管理。
+                </p>
+
+                <div class="feature-list">
+                    <div class="feature-item">
+                        <div class="feature-icon">✓</div>
+                        <div>实时采集环境数据</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">✓</div>
+                        <div>支持设备远程控制</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">✓</div>
+                        <div>提升温室管理效率</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form class="login-right" method="post">
+            <div class="login-title">
+                <h2>用户登录</h2>
+                <p>请输入账号和密码进入系统管理平台</p>
+            </div>
+
+            <div class="form-group">
+                <label>用户名</label>
+                <div class="input-box">
+                    <span>👤</span>
+                    <input placeholder="请输入用户名" name="username" autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>密码</label>
+                <div class="input-box">
+                    <span>🔒</span>
+                    <input placeholder="请输入密码" name="password" type="password" autocomplete="current-password">
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button type="submit">登录系统</button>
+                <button type="reset">重置</button>
+            </div>
+
+            {% if username %}
+            <p class="message">已提交用户：{{ username }}</p>
+            {% endif %}
+
+            <div class="footer-tip">
+                农林物联网系统综合实训 · Web 登录模块
+            </div>
+        </form>
+
+    </div>
+</body>
+</html>
