@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -17,6 +18,10 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 NLE_DEVICE_ID = "1516155"
 NLE_API_HOST = "http://api.nlecloud.com"
+SENSOR_HISTORY = []
+HISTORY_LIMIT = 10
+KIMI_API_BASE = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.ai/v1").rstrip("/")
+KIMI_MODEL = os.environ.get("KIMI_MODEL", "kimi-k2.6")
 
 SENSORS = [
     {"name": "当前温度", "tag": "currentTemp", "unit": "℃", "icon": "thermometer"},
@@ -142,6 +147,78 @@ def build_sensor_data():
     return sensor_data, has_error
 
 
+def numeric_value(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def append_sensor_history(sensors, updated_at):
+    values = {}
+    for sensor in sensors:
+        value = numeric_value(sensor["value"])
+        if value is not None:
+            values[sensor["tag"]] = value
+
+    if not values:
+        return
+
+    SENSOR_HISTORY.append({"time": updated_at, "values": values})
+    del SENSOR_HISTORY[:-HISTORY_LIMIT]
+
+
+def format_history_for_ai():
+    if not SENSOR_HISTORY:
+        return "暂无历史记录。"
+
+    labels = {
+        "currentTemp": "当前温度",
+        "upperLimit": "上限温度",
+        "lowerLimit": "下限温度",
+        "alarm": "温度报警",
+        "m_pressure": "大气压力",
+        "m_co2": "二氧化碳",
+        "m_wind_speed": "风速",
+    }
+    lines = []
+    for item in SENSOR_HISTORY[-HISTORY_LIMIT:]:
+        values = "，".join(
+            f"{labels.get(tag, tag)}={value}"
+            for tag, value in item["values"].items()
+        )
+        lines.append(f"{item['time']}：{values}")
+
+    return "\n".join(lines)
+
+
+def request_kimi(messages, temperature=0.35):
+    api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()
+    if not api_key:
+        return "", "未配置 MOONSHOT_API_KEY 环境变量"
+
+    data, error = request_json(
+        f"{KIMI_API_BASE}/chat/completions",
+        method="POST",
+        token=api_key,
+        body={
+            "model": KIMI_MODEL,
+            "messages": messages,
+            "temperature": temperature,
+        },
+    )
+
+    if error:
+        return "", error
+
+    choices = data.get("choices") or []
+    if not choices:
+        return "", data.get("error", {}).get("message", "Kimi 未返回有效回复")
+
+    message = choices[0].get("message") or {}
+    return message.get("content", "").strip(), ""
+
+
 def build_sensor_placeholders():
     return [
         {
@@ -259,14 +336,95 @@ def sensor_api():
         return jsonify({"ok": False, "error": "未登录"}), 401
 
     sensors, has_error = build_sensor_data()
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_sensor_history(sensors, updated_at)
+
     return jsonify(
         {
             "ok": True,
             "sensors": sensors,
             "has_error": has_error,
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "updated_at": updated_at,
         }
     )
+
+
+@app.route("/api/history")
+def history_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    return jsonify({"ok": True, "history": SENSOR_HISTORY[-HISTORY_LIMIT:]})
+
+
+@app.route("/api/ai-advice")
+def ai_advice_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是智慧农业温室监测助手。请根据最近传感器历史数据，"
+                "用中文给出简短、可执行的环境建议。回复控制在 120 字以内，"
+                "重点关注温度、CO2、风速、报警状态。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"最近 {HISTORY_LIMIT} 次历史记录如下：\n{format_history_for_ai()}",
+        },
+    ]
+    answer, error = request_kimi(messages)
+    if error:
+        return jsonify({"ok": False, "error": error}), 502
+
+    return jsonify({"ok": True, "advice": answer})
+
+
+@app.route("/api/ai-chat", methods=["POST"])
+def ai_chat_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    user_message = (payload.get("message") or "").strip()
+    if not user_message:
+        return jsonify({"ok": False, "error": "请输入问题"}), 400
+
+    chat_history = session.get("ai_chat_history", [])[-8:]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是嵌入在温室环境监测系统里的 AI 助手。"
+                "你能读取最近的传感器历史记录，并回答用户关于温室环境、数据趋势、异常原因和处理建议的问题。"
+                "回答要具体、简洁，优先结合数据，不要编造没有的数据。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"当前系统最近 {HISTORY_LIMIT} 次历史记录：\n{format_history_for_ai()}",
+        },
+    ]
+    messages.extend(chat_history)
+    messages.append({"role": "user", "content": user_message})
+
+    answer, error = request_kimi(messages, temperature=0.45)
+    if error:
+        return jsonify({"ok": False, "error": error}), 502
+
+    chat_history.extend(
+        [
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": answer},
+        ]
+    )
+    session["ai_chat_history"] = chat_history[-8:]
+    session.modified = True
+
+    return jsonify({"ok": True, "answer": answer})
 
 
 @app.route("/profile", methods=["GET", "POST"])

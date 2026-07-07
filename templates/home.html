@@ -686,6 +686,174 @@
         background: #ef4444;
     }
 
+    .history-section {
+        padding: 28px;
+    }
+
+    .history-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+    }
+
+    .history-title h2 {
+        margin: 0;
+        color: #0f2f24;
+        font-size: 24px;
+    }
+
+    .history-title p {
+        margin: 8px 0 0;
+        color: #6b8177;
+        font-size: 14px;
+    }
+
+    .history-badge {
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        color: #0f7049;
+        background: rgba(16, 185, 129, 0.10);
+        border: 1px solid rgba(16, 185, 129, 0.16);
+        font-size: 13px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .chart-panel {
+        height: 340px;
+        margin-bottom: 22px;
+        padding: 16px;
+        border-radius: 18px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 252, 250, 0.82)),
+            radial-gradient(circle at 18% 10%, rgba(16, 185, 129, 0.10), transparent 30%);
+        border: 1px solid rgba(15, 118, 82, 0.10);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .chart-panel canvas {
+        display: none;
+    }
+
+    .trend-svg {
+        position: absolute;
+        inset: 16px;
+        z-index: 2;
+    }
+
+    .trend-svg svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .trend-line {
+        fill: none;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 10px 18px rgba(16, 185, 129, 0.20));
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+        animation: trend-draw 0.9s ease forwards;
+    }
+
+    .trend-area {
+        opacity: 0.16;
+    }
+
+    .trend-point {
+        stroke: #ffffff;
+        stroke-width: 3;
+        filter: drop-shadow(0 6px 12px rgba(16, 185, 129, 0.20));
+    }
+
+    .trend-empty {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #7c9188;
+        font-size: 14px;
+    }
+
+    .trend-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .trend-stat {
+        min-height: 76px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 252, 250, 0.88));
+        border: 1px solid rgba(15, 118, 82, 0.10);
+    }
+
+    .trend-stat span {
+        display: block;
+        margin-bottom: 8px;
+        color: #7c9188;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .trend-stat strong {
+        color: #0f2f24;
+        font-size: 24px;
+        line-height: 1;
+    }
+
+    .trend-stat em {
+        margin-left: 6px;
+        color: #10b981;
+        font-size: 12px;
+        font-style: normal;
+        font-weight: 800;
+    }
+
+    .history-table-wrap {
+        overflow-x: auto;
+        border: 1px solid rgba(15, 118, 82, 0.10);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.76);
+    }
+
+    .history-table {
+        width: 100%;
+        min-width: 720px;
+        border-collapse: collapse;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 13px 14px;
+        border-bottom: 1px solid rgba(15, 118, 82, 0.08);
+        color: #315f4c;
+        font-size: 13px;
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .history-table th {
+        color: #0f2f24;
+        background: rgba(16, 185, 129, 0.08);
+        font-weight: 800;
+    }
+
+    .history-table tr:last-child td {
+        border-bottom: none;
+    }
+
     @keyframes refresh-spin {
         to {
             transform: rotate(360deg);
@@ -728,6 +896,12 @@
             transform: scale(1);
             color: #063f2c;
             text-shadow: none;
+        }
+    }
+
+    @keyframes trend-draw {
+        to {
+            stroke-dashoffset: 0;
         }
     }
 
@@ -923,12 +1097,59 @@
         {% endfor %}
     </div>
 </section>
+<section class="history-section section-card">
+    <div class="history-header">
+        <div class="history-title">
+            <h2>数据趋势</h2>
+            <p>自动记录最近 10 次采集数据，展示核心指标变化趋势</p>
+        </div>
+        <div class="history-badge" id="historyCount">记录 0/10</div>
+    </div>
+
+    <div class="chart-panel">
+        <div class="trend-svg" id="trendSvg"></div>
+    </div>
+
+    <div class="trend-stats" id="trendStats">
+        <div class="trend-stat"><span>最新温度</span><strong>--</strong><em>等待数据</em></div>
+        <div class="trend-stat"><span>平均温度</span><strong>--</strong><em>最近 10 次</em></div>
+        <div class="trend-stat"><span>CO₂ 峰值</span><strong>--</strong><em>ppm</em></div>
+        <div class="trend-stat"><span>风速波动</span><strong>--</strong><em>m/s</em></div>
+    </div>
+
+    <div class="history-table-wrap">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>当前温度</th>
+                    <th>上限温度</th>
+                    <th>下限温度</th>
+                    <th>温度报警</th>
+                    <th>大气压力</th>
+                    <th>二氧化碳</th>
+                    <th>风速</th>
+                </tr>
+            </thead>
+            <tbody id="historyTableBody">
+                <tr>
+                    <td colspan="8">暂无历史记录</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
 <script>
     const refreshButton = document.getElementById("refreshSensors");
     const updatedAt = document.getElementById("updatedAt");
     const sensorNotice = document.getElementById("sensorNotice");
+    const historyTableBody = document.getElementById("historyTableBody");
+    const historyCount = document.getElementById("historyCount");
+    const trendSvg = document.getElementById("trendSvg");
+    const trendStats = document.getElementById("trendStats");
     const normalStatusText = "数据获取正常";
     const autoRefreshMs = 10000;
+    const historyColumns = ["currentTemp", "upperLimit", "lowerLimit", "alarm", "m_pressure", "m_co2", "m_wind_speed"];
     let isRefreshing = false;
 
     function playCardAnimation() {
@@ -974,6 +1195,169 @@
         });
     }
 
+    function formatHistoryValue(values, tag) {
+        const value = values[tag];
+        return value === undefined || value === null ? "--" : value;
+    }
+
+    function buildTrendPath(points) {
+        return points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+    }
+
+    function average(values) {
+        const valid = values.filter((value) => value !== undefined && value !== null);
+        if (!valid.length) {
+            return null;
+        }
+
+        return valid.reduce((total, value) => total + value, 0) / valid.length;
+    }
+
+    function updateTrendStats(history) {
+        if (!trendStats) {
+            return;
+        }
+
+        const latest = history[history.length - 1]?.values || {};
+        const temps = history.map((item) => item.values.currentTemp).filter((value) => value !== undefined && value !== null);
+        const co2Values = history.map((item) => item.values.m_co2).filter((value) => value !== undefined && value !== null);
+        const windValues = history.map((item) => item.values.m_wind_speed).filter((value) => value !== undefined && value !== null);
+        const windSpread = windValues.length ? Math.max(...windValues) - Math.min(...windValues) : null;
+        const avgTemp = average(temps);
+
+        trendStats.innerHTML = `
+            <div class="trend-stat"><span>最新温度</span><strong>${latest.currentTemp ?? "--"}</strong><em>℃</em></div>
+            <div class="trend-stat"><span>平均温度</span><strong>${avgTemp === null ? "--" : avgTemp.toFixed(1)}</strong><em>最近 10 次</em></div>
+            <div class="trend-stat"><span>CO₂ 峰值</span><strong>${co2Values.length ? Math.max(...co2Values) : "--"}</strong><em>ppm</em></div>
+            <div class="trend-stat"><span>风速波动</span><strong>${windSpread === null ? "--" : windSpread.toFixed(1)}</strong><em>m/s</em></div>
+        `;
+    }
+
+    function renderTrendSvg(history) {
+        if (!trendSvg) {
+            return;
+        }
+
+        const tempHistory = history.filter((item) => item.values.currentTemp !== undefined && item.values.currentTemp !== null);
+        if (!tempHistory.length) {
+            trendSvg.innerHTML = '<div class="trend-empty">暂无趋势数据，等待自动采集</div>';
+            return;
+        }
+
+        const width = 960;
+        const height = 300;
+        const padding = { top: 44, right: 34, bottom: 44, left: 58 };
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const values = tempHistory.map((item) => item.values.currentTemp);
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const paddedMin = Math.floor(minValue - 2);
+        const paddedMax = Math.ceil(maxValue + 2);
+        const range = paddedMax - paddedMin || 1;
+        const divisor = Math.max(tempHistory.length - 1, 1);
+
+        const points = tempHistory.map((item, index) => {
+            const value = item.values.currentTemp;
+            return {
+                x: padding.left + (plotWidth * index) / divisor,
+                y: padding.top + plotHeight - ((value - paddedMin) / range) * plotHeight,
+                value,
+                time: item.time.slice(11),
+            };
+        });
+
+        const path = buildTrendPath(points);
+        const areaPath = `${path} L ${points[points.length - 1].x.toFixed(1)} ${height - padding.bottom} L ${points[0].x.toFixed(1)} ${height - padding.bottom} Z`;
+        const latest = points[points.length - 1];
+        const first = points[0];
+        const delta = latest.value - first.value;
+        const trendText = Math.abs(delta) < 0.1 ? "稳定" : delta > 0 ? `上升 ${delta.toFixed(1)}℃` : `下降 ${Math.abs(delta).toFixed(1)}℃`;
+
+        const gridRatios = [0, 0.25, 0.5, 0.75, 1];
+        const grid = gridRatios.map((ratio) => {
+            const y = padding.top + plotHeight * ratio;
+            const value = paddedMax - range * ratio;
+            return `
+                <line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="rgba(15,118,82,0.08)" />
+                <text x="${padding.left - 14}" y="${y + 4}" text-anchor="end" fill="#7c9188" font-size="12">${value.toFixed(0)}</text>
+            `;
+        }).join("");
+
+        const pointMarkup = points.map((point, index) => {
+            const showPoint = index === 0 || index === points.length - 1 || index % 3 === 0;
+            if (!showPoint) {
+                return "";
+            }
+            const radius = index === points.length - 1 ? 7 : 4;
+            return `<circle class="trend-point" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${radius}" fill="#10b981"><title>${point.time} 当前温度: ${point.value}℃</title></circle>`;
+        }).join("");
+
+        const timeLabels = [points[0], latest].map((point, index) => (
+            `<text x="${point.x}" y="${height - 16}" text-anchor="${index === 0 ? "start" : "end"}" fill="#6b8177" font-size="12">${point.time}</text>`
+        )).join("");
+
+        trendSvg.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="当前温度趋势图">
+                <defs>
+                    <linearGradient id="tempArea" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.26" />
+                        <stop offset="68%" stop-color="#10b981" stop-opacity="0.07" />
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+                    </linearGradient>
+                </defs>
+                <text x="${padding.left}" y="22" fill="#0f2f24" font-size="15" font-weight="800">当前温度趋势</text>
+                <text x="${padding.left + 112}" y="22" fill="#10b981" font-size="13" font-weight="800">${trendText}</text>
+                ${grid}
+                <path class="trend-area" d="${areaPath}" fill="url(#tempArea)" />
+                <path d="${path}" stroke="#10b981" stroke-width="12" opacity="0.10" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                <path class="trend-line" d="${path}" stroke="#10b981" />
+                <circle cx="${latest.x.toFixed(1)}" cy="${latest.y.toFixed(1)}" r="18" fill="#10b981" opacity="0.10" />
+                ${pointMarkup}
+                <text x="${latest.x - 8}" y="${Math.max(latest.y - 18, 34)}" text-anchor="end" fill="#0f7049" font-size="18" font-weight="900">${latest.value}℃</text>
+                ${timeLabels}
+            </svg>
+        `;
+    }
+
+    function updateHistoryView(history) {
+        if (historyCount) {
+            historyCount.textContent = `记录 ${history.length}/10`;
+        }
+
+        updateTrendStats(history);
+        renderTrendSvg(history);
+
+        if (!historyTableBody) {
+            return;
+        }
+
+        const recent = history.slice(-10).reverse();
+        if (!recent.length) {
+            historyTableBody.innerHTML = '<tr><td colspan="8">暂无历史记录</td></tr>';
+            return;
+        }
+
+        historyTableBody.innerHTML = recent.map((item) => {
+            const cells = historyColumns.map((tag) => `<td>${formatHistoryValue(item.values, tag)}</td>`).join("");
+            return `<tr><td>${item.time}</td>${cells}</tr>`;
+        }).join("");
+    }
+
+    async function refreshHistory() {
+        const response = await fetch("{{ url_for('history_api') }}", {
+            headers: { "Accept": "application/json" },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error("history failed");
+        }
+
+        const data = await response.json();
+        updateHistoryView(data.history || []);
+    }
+
     async function refreshSensorData() {
         if (isRefreshing) {
             return;
@@ -1014,6 +1398,7 @@
                 sensorNotice.textContent = data.has_error ? "部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。" : "传感器数据获取成功。";
             }
 
+            await refreshHistory();
             playCardAnimation();
         } catch (error) {
             console.error(error);
