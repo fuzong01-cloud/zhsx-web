@@ -854,6 +854,148 @@
         border-bottom: none;
     }
 
+    .ai-float {
+        position: fixed;
+        right: 28px;
+        bottom: 28px;
+        z-index: 30;
+    }
+
+    .ai-toggle {
+        width: 58px;
+        height: 58px;
+        border: none;
+        border-radius: 50%;
+        color: #ffffff;
+        background: linear-gradient(135deg, #10b981, #0f8f5d);
+        box-shadow: 0 18px 38px rgba(16, 185, 129, 0.36);
+        cursor: pointer;
+        font-size: 22px;
+        font-weight: 900;
+    }
+
+    .ai-panel {
+        width: 380px;
+        max-width: calc(100vw - 40px);
+        height: 540px;
+        max-height: calc(100vh - 110px);
+        margin-bottom: 14px;
+        border-radius: 18px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.96);
+        border: 1px solid rgba(15, 118, 82, 0.12);
+        box-shadow: 0 28px 70px rgba(0, 70, 45, 0.22);
+        display: none;
+        flex-direction: column;
+    }
+
+    .ai-panel.open {
+        display: flex;
+    }
+
+    .ai-head {
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: linear-gradient(135deg, #063f2c, #0f8f5d);
+        color: #ffffff;
+    }
+
+    .ai-head strong {
+        display: block;
+        font-size: 16px;
+    }
+
+    .ai-head span {
+        display: block;
+        margin-top: 4px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 12px;
+    }
+
+    .ai-close {
+        border: none;
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.14);
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 18px;
+    }
+
+    .ai-advice {
+        margin: 14px 14px 0;
+        padding: 12px;
+        border-radius: 14px;
+        color: #0f7049;
+        background: rgba(16, 185, 129, 0.10);
+        border: 1px solid rgba(16, 185, 129, 0.12);
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .ai-messages {
+        flex: 1;
+        min-height: 0;
+        padding: 14px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .ai-msg {
+        max-width: 86%;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-size: 13px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+    }
+
+    .ai-msg.assistant {
+        align-self: flex-start;
+        color: #123c2c;
+        background: #eef7f2;
+    }
+
+    .ai-msg.user {
+        align-self: flex-end;
+        color: #ffffff;
+        background: #10b981;
+    }
+
+    .ai-form {
+        padding: 12px;
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid rgba(15, 118, 82, 0.10);
+    }
+
+    .ai-input {
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid rgba(15, 118, 82, 0.14);
+        border-radius: 12px;
+        outline: none;
+        color: #123c2c;
+        background: #f8fcfa;
+    }
+
+    .ai-send {
+        width: 58px;
+        border: none;
+        border-radius: 12px;
+        color: #ffffff;
+        background: #10b981;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
     @keyframes refresh-spin {
         to {
             transform: rotate(360deg);
@@ -1139,6 +1281,26 @@
         </table>
     </div>
 </section>
+<div class="ai-float">
+    <div class="ai-panel" id="aiPanel">
+        <div class="ai-head">
+            <div>
+                <strong>AI 温室助手</strong>
+                <span>读取历史记录，实时给出建议</span>
+            </div>
+            <button class="ai-close" id="aiClose" type="button">×</button>
+        </div>
+        <div class="ai-advice" id="aiAdvice">正在等待传感器历史数据...</div>
+        <div class="ai-messages" id="aiMessages">
+            <div class="ai-msg assistant">你好，我会结合最近 10 次历史记录，帮你分析温室环境并给出处理建议。</div>
+        </div>
+        <form class="ai-form" id="aiForm">
+            <input class="ai-input" id="aiInput" placeholder="问问温度、CO₂、趋势或异常原因">
+            <button class="ai-send" type="submit">发送</button>
+        </form>
+    </div>
+    <button class="ai-toggle" id="aiToggle" type="button">AI</button>
+</div>
 <script>
     const refreshButton = document.getElementById("refreshSensors");
     const updatedAt = document.getElementById("updatedAt");
@@ -1147,10 +1309,19 @@
     const historyCount = document.getElementById("historyCount");
     const trendSvg = document.getElementById("trendSvg");
     const trendStats = document.getElementById("trendStats");
+    const aiPanel = document.getElementById("aiPanel");
+    const aiToggle = document.getElementById("aiToggle");
+    const aiClose = document.getElementById("aiClose");
+    const aiAdvice = document.getElementById("aiAdvice");
+    const aiMessages = document.getElementById("aiMessages");
+    const aiForm = document.getElementById("aiForm");
+    const aiInput = document.getElementById("aiInput");
     const normalStatusText = "数据获取正常";
     const autoRefreshMs = 10000;
+    const aiAdviceRefreshMs = 30000;
     const historyColumns = ["currentTemp", "upperLimit", "lowerLimit", "alarm", "m_pressure", "m_co2", "m_wind_speed"];
     let isRefreshing = false;
+    let lastAdviceAt = 0;
 
     function playCardAnimation() {
         document.querySelectorAll(".metric-card").forEach((card, index) => {
@@ -1358,6 +1529,77 @@
         updateHistoryView(data.history || []);
     }
 
+    function appendAiMessage(role, content) {
+        if (!aiMessages) {
+            return;
+        }
+
+        const item = document.createElement("div");
+        item.className = `ai-msg ${role}`;
+        item.textContent = content;
+        aiMessages.appendChild(item);
+        aiMessages.scrollTop = aiMessages.scrollHeight;
+    }
+
+    async function refreshAiAdvice(force = false) {
+        if (!aiAdvice) {
+            return;
+        }
+
+        const now = Date.now();
+        if (!force && now - lastAdviceAt < aiAdviceRefreshMs) {
+            return;
+        }
+
+        lastAdviceAt = now;
+        aiAdvice.textContent = "AI 正在分析最近历史记录...";
+
+        try {
+            const response = await fetch("{{ url_for('ai_advice_api') }}", {
+                headers: { "Accept": "application/json" },
+                cache: "no-store",
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "AI 建议获取失败");
+            }
+
+            aiAdvice.textContent = data.advice;
+        } catch (error) {
+            aiAdvice.textContent = error.message;
+        }
+    }
+
+    async function sendAiMessage(message) {
+        appendAiMessage("user", message);
+        appendAiMessage("assistant", "正在结合历史记录思考...");
+
+        try {
+            const response = await fetch("{{ url_for('ai_chat_api') }}", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ message }),
+            });
+            const data = await response.json();
+            const pending = aiMessages.querySelector(".ai-msg.assistant:last-child");
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || "AI 回复失败");
+            }
+
+            pending.textContent = data.answer;
+        } catch (error) {
+            const pending = aiMessages.querySelector(".ai-msg.assistant:last-child");
+            if (pending) {
+                pending.textContent = error.message;
+            }
+        }
+    }
+
     async function refreshSensorData() {
         if (isRefreshing) {
             return;
@@ -1399,6 +1641,7 @@
             }
 
             await refreshHistory();
+            refreshAiAdvice();
             playCardAnimation();
         } catch (error) {
             console.error(error);
@@ -1419,6 +1662,33 @@
     if (refreshButton) {
         refreshButton.addEventListener("click", () => {
             refreshSensorData();
+        });
+    }
+
+    if (aiToggle && aiPanel) {
+        aiToggle.addEventListener("click", () => {
+            aiPanel.classList.toggle("open");
+            if (aiPanel.classList.contains("open")) {
+                refreshAiAdvice(true);
+            }
+        });
+    }
+
+    if (aiClose && aiPanel) {
+        aiClose.addEventListener("click", () => {
+            aiPanel.classList.remove("open");
+        });
+    }
+
+    if (aiForm && aiInput) {
+        aiForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const message = aiInput.value.trim();
+            if (!message) {
+                return;
+            }
+            aiInput.value = "";
+            sendAiMessage(message);
         });
     }
 

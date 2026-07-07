@@ -58,12 +58,14 @@ def allowed_photo(filename):
     return suffix in {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
-def request_json(url, method="GET", token="", body=None):
+def request_json(url, method="GET", token="", body=None, bearer_token=""):
     headers = {}
     data = None
 
     if token:
         headers["AccessToken"] = token
+    if bearer_token:
+        headers["Authorization"] = f"Bearer {bearer_token}"
 
     if body is not None:
         headers["Content-Type"] = "application/json"
@@ -200,7 +202,7 @@ def request_kimi(messages, temperature=0.35):
     data, error = request_json(
         f"{KIMI_API_BASE}/chat/completions",
         method="POST",
-        token=api_key,
+        bearer_token=api_key,
         body={
             "model": KIMI_MODEL,
             "messages": messages,
