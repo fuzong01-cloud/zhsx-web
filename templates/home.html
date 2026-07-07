@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}系统首页{% endblock %}
 {% block page_title %}系统首页{% endblock %}
@@ -297,6 +297,53 @@
         line-height: 1.5;
     }
 
+    .sensor-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .refresh-btn {
+        height: 42px;
+        padding: 0 18px;
+        border: none;
+        border-radius: 13px;
+        background: linear-gradient(135deg, #10b981, #0f8f5d);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 14px 26px rgba(16, 185, 129, 0.24);
+        transition: all 0.25s ease;
+    }
+
+    .refresh-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 34px rgba(16, 185, 129, 0.32);
+    }
+
+    .refresh-btn.is-loading {
+        pointer-events: none;
+        opacity: 0.86;
+    }
+
+    .refresh-icon {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.55);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+    }
+
+    .refresh-btn.is-loading .refresh-icon {
+        animation: refresh-spin 0.75s linear infinite;
+    }
+
     .status-grid {
         display: grid;
         grid-template-columns: repeat(3, 150px);
@@ -391,6 +438,22 @@
         transform: translateY(-4px);
         box-shadow: 0 20px 42px rgba(0, 80, 50, 0.13);
         border-color: rgba(16, 185, 129, 0.28);
+    }
+
+    .metric-card.is-refreshing {
+        animation: card-refresh 0.7s ease both;
+        border-color: rgba(16, 185, 129, 0.36);
+    }
+
+    .metric-card.is-refreshing::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        background: linear-gradient(110deg, transparent 0%, rgba(16, 185, 129, 0.10) 42%, rgba(255, 255, 255, 0.72) 50%, rgba(16, 185, 129, 0.10) 58%, transparent 100%);
+        transform: translateX(-100%);
+        animation: card-shimmer 0.7s ease forwards;
+        pointer-events: none;
     }
 
     .metric-top,
@@ -583,6 +646,10 @@
         letter-spacing: -0.5px;
     }
 
+    .metric-value.is-updated {
+        animation: value-pulse 0.58s ease both;
+    }
+
     .metric-unit {
         color: #6f8b7e;
         font-size: 16px;
@@ -617,6 +684,51 @@
 
     .metric-dot.danger {
         background: #ef4444;
+    }
+
+    @keyframes refresh-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes card-refresh {
+        0% {
+            transform: translateY(0);
+        }
+
+        45% {
+            transform: translateY(-4px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes card-shimmer {
+        to {
+            transform: translateX(100%);
+        }
+    }
+
+    @keyframes value-pulse {
+        0% {
+            transform: scale(1);
+            color: #063f2c;
+        }
+
+        45% {
+            transform: scale(1.08);
+            color: #10b981;
+            text-shadow: 0 10px 24px rgba(16, 185, 129, 0.22);
+        }
+
+        100% {
+            transform: scale(1);
+            color: #063f2c;
+            text-shadow: none;
+        }
     }
 
     @media (max-width: 1180px) {
@@ -730,11 +842,17 @@
             <h2>传感器数据</h2>
             <p>实时采集温室环境核心指标</p>
             {% if has_error %}
-            <div class="info-notice">部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。</div>
+            <div class="info-notice" id="sensorNotice">部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。</div>
             {% else %}
-            <div class="info-notice">传感器数据获取成功。</div>
+            <div class="info-notice" id="sensorNotice">传感器数据加载中。</div>
             {% endif %}
         </div>
+
+        <div class="sensor-actions">
+        <button class="refresh-btn" id="refreshSensors" type="button">
+            <span class="refresh-icon"></span>
+            <span>刷新数据</span>
+        </button>
 
         <div class="status-grid">
             <div class="status-card">
@@ -757,15 +875,16 @@
                 <div class="status-icon"></div>
                 <div>
                     <p>数据更新时间</p>
-                    <strong>--</strong>
+                    <strong id="updatedAt">{{ updated_at }}</strong>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
     <div class="sensor-grid">
         {% for sensor in sensors %}
-        <div class="metric-card">
+        <div class="metric-card" data-tag="{{ sensor.tag }}">
             <div class="metric-top">
                 <div class="metric-name">
                     {% if sensor.icon == "alarm" %}
@@ -790,18 +909,135 @@
             </div>
 
             <div class="metric-value-row">
-                <span class="metric-value">{{ sensor.value }}</span>
+                <span class="metric-value" data-role="value">{{ sensor.value }}</span>
                 {% if sensor.unit %}
-                <span class="metric-unit">{{ sensor.unit }}</span>
+                <span class="metric-unit" data-role="unit">{{ sensor.unit }}</span>
                 {% endif %}
             </div>
 
             <div class="metric-footer">
-                <span class="metric-dot {{ 'danger' if sensor.error else 'success' }}"></span>
-                <span>{{ sensor.error if sensor.error else '数据获取正常' }}</span>
+                <span class="metric-dot {{ 'danger' if sensor.error else 'success' }}" data-role="dot"></span>
+                <span data-role="status">{{ sensor.error if sensor.error else '数据获取正常' }}</span>
             </div>
         </div>
         {% endfor %}
     </div>
 </section>
+<script>
+    const refreshButton = document.getElementById("refreshSensors");
+    const updatedAt = document.getElementById("updatedAt");
+    const sensorNotice = document.getElementById("sensorNotice");
+    const normalStatusText = "数据获取正常";
+    const autoRefreshMs = 10000;
+    let isRefreshing = false;
+
+    function playCardAnimation() {
+        document.querySelectorAll(".metric-card").forEach((card, index) => {
+            card.classList.remove("is-refreshing");
+            void card.offsetWidth;
+            setTimeout(() => card.classList.add("is-refreshing"), index * 70);
+            setTimeout(() => card.classList.remove("is-refreshing"), 950 + index * 70);
+        });
+    }
+
+    function updateSensorCards(sensors) {
+        sensors.forEach((sensor) => {
+            const card = document.querySelector(`.metric-card[data-tag="${sensor.tag}"]`);
+            if (!card) {
+                return;
+            }
+
+            const value = card.querySelector('[data-role="value"]');
+            const unit = card.querySelector('[data-role="unit"]');
+            const dot = card.querySelector('[data-role="dot"]');
+            const status = card.querySelector('[data-role="status"]');
+
+            if (value) {
+                value.textContent = sensor.value;
+                value.classList.remove("is-updated");
+                void value.offsetWidth;
+                value.classList.add("is-updated");
+            }
+
+            if (unit) {
+                unit.textContent = sensor.unit || "";
+            }
+
+            if (dot) {
+                dot.classList.toggle("danger", Boolean(sensor.error));
+                dot.classList.toggle("success", !sensor.error);
+            }
+
+            if (status) {
+                status.textContent = sensor.error || normalStatusText;
+            }
+        });
+    }
+
+    async function refreshSensorData() {
+        if (isRefreshing) {
+            return;
+        }
+
+        isRefreshing = true;
+        const label = refreshButton ? refreshButton.querySelector("span:last-child") : null;
+
+        if (refreshButton && label) {
+            refreshButton.classList.add("is-loading");
+            label.textContent = "刷新中";
+        }
+
+        if (sensorNotice) {
+            sensorNotice.textContent = "传感器数据加载中。";
+        }
+
+        playCardAnimation();
+
+        try {
+            const response = await fetch("{{ url_for('sensor_api') }}", {
+                headers: { "Accept": "application/json" },
+                cache: "no-store",
+            });
+
+            if (!response.ok) {
+                throw new Error("refresh failed");
+            }
+
+            const data = await response.json();
+            updateSensorCards(data.sensors || []);
+
+            if (updatedAt && data.updated_at) {
+                updatedAt.textContent = data.updated_at;
+            }
+
+            if (sensorNotice) {
+                sensorNotice.textContent = data.has_error ? "部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。" : "传感器数据获取成功。";
+            }
+
+            playCardAnimation();
+        } catch (error) {
+            console.error(error);
+
+            if (sensorNotice) {
+                sensorNotice.textContent = "数据刷新失败，请稍后重试。";
+            }
+        } finally {
+            if (refreshButton && label) {
+                refreshButton.classList.remove("is-loading");
+                label.textContent = "刷新数据";
+            }
+
+            isRefreshing = false;
+        }
+    }
+
+    if (refreshButton) {
+        refreshButton.addEventListener("click", () => {
+            refreshSensorData();
+        });
+    }
+
+    refreshSensorData();
+    setInterval(refreshSensorData, autoRefreshMs);
+</script>
 {% endblock %}

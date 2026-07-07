@@ -5,7 +5,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -142,6 +142,20 @@ def build_sensor_data():
     return sensor_data, has_error
 
 
+def build_sensor_placeholders():
+    return [
+        {
+            "name": sensor["name"],
+            "tag": sensor["tag"],
+            "unit": sensor["unit"],
+            "icon": sensor["icon"],
+            "value": "--",
+            "error": "数据加载中",
+        }
+        for sensor in SENSORS
+    ]
+
+
 def get_cloud_auth_info():
     token = session.get("nle_access_token", "")
     return {
@@ -227,16 +241,31 @@ def home():
     if not username:
         return redirect(url_for("login"))
 
-    sensors, has_error = build_sensor_data()
     return render_template(
         "home.html",
         username=username,
         user=USERS[username],
         device_id=NLE_DEVICE_ID,
-        sensors=sensors,
-        has_error=has_error,
-        updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        sensors=build_sensor_placeholders(),
+        has_error=False,
+        updated_at="等待加载",
         cloud_authorized=bool(session.get("nle_access_token")),
+    )
+
+
+@app.route("/api/sensors")
+def sensor_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    sensors, has_error = build_sensor_data()
+    return jsonify(
+        {
+            "ok": True,
+            "sensors": sensors,
+            "has_error": has_error,
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
     )
 
 
