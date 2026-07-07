@@ -16,11 +16,27 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def load_local_env():
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip().lstrip("\ufeff"), value.strip().strip('"').strip("'"))
+
+
+load_local_env()
+
 NLE_DEVICE_ID = "1516155"
 NLE_API_HOST = "http://api.nlecloud.com"
 SENSOR_HISTORY = []
 HISTORY_LIMIT = 10
-KIMI_API_BASE = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.ai/v1").rstrip("/")
+KIMI_API_BASE = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.cn/v1").rstrip("/")
 KIMI_MODEL = os.environ.get("KIMI_MODEL", "kimi-k2.6")
 
 SENSORS = [
@@ -32,6 +48,15 @@ SENSORS = [
     {"name": "二氧化碳", "tag": "m_co2", "unit": "ppm", "icon": "cloud"},
     {"name": "风速", "tag": "m_wind_speed", "unit": "m/s", "icon": "wind"},
 ]
+
+DEVICE_COMMANDS = {
+    "actuator": "actuator",
+}
+
+THRESHOLD_COMMANDS = {
+    "upperLimit": "upperLimit",
+    "lowerLimit": "lowerLimit",
+}
 
 USERS = {
     "15600002034": {
@@ -58,7 +83,7 @@ def allowed_photo(filename):
     return suffix in {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
-def request_json(url, method="GET", token="", body=None, bearer_token=""):
+def request_json(url, method="GET", token="", body=None, bearer_token="", timeout=8):
     headers = {}
     data = None
 
@@ -74,10 +99,11 @@ def request_json(url, method="GET", token="", body=None, bearer_token=""):
     req = Request(url, data=data, headers=headers, method=method)
 
     try:
-        with urlopen(req, timeout=8) as response:
+        with urlopen(req, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8")), ""
     except HTTPError as exc:
-        return None, f"HTTP {exc.code}"
+        detail = exc.read().decode("utf-8", errors="replace")
+        return None, f"HTTP {exc.code}: {detail}"
     except URLError:
         return None, "无法连接云平台"
     except TimeoutError:
@@ -126,6 +152,23 @@ def get_sensor_value(api_tag):
         value = result.get("value", "--")
 
     return {"ok": True, "value": value, "error": ""}
+
+
+def send_device_command(api_tag, value):
+    token = session.get("nle_access_token")
+    if not token:
+        return False, "请先完成云平台授权"
+
+    url = f"{NLE_API_HOST}/Cmds?deviceId={NLE_DEVICE_ID}&apiTag={api_tag}"
+    body = {"deviceId": NLE_DEVICE_ID, "apiTag": api_tag, "value": value}
+    data, error = request_json(url, method="POST", token=token, body=body)
+    if error:
+        return False, error
+
+    if data.get("Status") == 0 or data.get("ResultObj") is not None:
+        return True, ""
+
+    return False, data.get("Msg", "云平台未确认命令执行成功")
 
 
 def build_sensor_data():
@@ -194,7 +237,7 @@ def format_history_for_ai():
     return "\n".join(lines)
 
 
-def request_kimi(messages, temperature=0.35):
+def request_kimi(messages, temperature=1):
     api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()
     if not api_key:
         return "", "未配置 MOONSHOT_API_KEY 环境变量"
@@ -208,6 +251,7 @@ def request_kimi(messages, temperature=0.35):
             "messages": messages,
             "temperature": temperature,
         },
+        timeout=35,
     )
 
     if error:
@@ -359,6 +403,62 @@ def history_api():
     return jsonify({"ok": True, "history": SENSOR_HISTORY[-HISTORY_LIMIT:]})
 
 
+@app.route("/hardware")
+def hardware():
+    if not session.get("username"):
+        return redirect(url_for("login"))
+
+    return render_template("hardware.html", cloud_authorized=bool(session.get("nle_access_token")))
+
+
+@app.route("/strategy")
+def strategy():
+    if not session.get("username"):
+        return redirect(url_for("login"))
+
+    return render_template("strategy.html", cloud_authorized=bool(session.get("nle_access_token")))
+
+
+@app.route("/api/device-switch", methods=["POST"])
+def device_switch_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    enabled = bool(payload.get("enabled"))
+    ok, error = send_device_command(DEVICE_COMMANDS["actuator"], 1 if enabled else 0)
+    return jsonify({"ok": ok, "error": error, "enabled": enabled})
+
+
+@app.route("/api/thresholds", methods=["POST"])
+def thresholds_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    try:
+        upper = float(payload.get("upperLimit"))
+        lower = float(payload.get("lowerLimit"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "阈值必须是数字"}), 400
+
+    if lower >= upper:
+        return jsonify({"ok": False, "error": "下限必须小于上限"}), 400
+
+    if lower < -40 or upper > 100:
+        return jsonify({"ok": False, "error": "温度阈值范围应在 -40 到 100 ℃之间"}), 400
+
+    upper_ok, upper_error = send_device_command(THRESHOLD_COMMANDS["upperLimit"], upper)
+    if not upper_ok:
+        return jsonify({"ok": False, "error": f"上限更新失败：{upper_error}"}), 502
+
+    lower_ok, lower_error = send_device_command(THRESHOLD_COMMANDS["lowerLimit"], lower)
+    if not lower_ok:
+        return jsonify({"ok": False, "error": f"下限更新失败：{lower_error}"}), 502
+
+    return jsonify({"ok": True, "upperLimit": upper, "lowerLimit": lower})
+
+
 @app.route("/api/ai-advice")
 def ai_advice_api():
     if not session.get("username"):
@@ -413,7 +513,7 @@ def ai_chat_api():
     messages.extend(chat_history)
     messages.append({"role": "user", "content": user_message})
 
-    answer, error = request_kimi(messages, temperature=0.45)
+    answer, error = request_kimi(messages, temperature=1)
     if error:
         return jsonify({"ok": False, "error": error}), 502
 
