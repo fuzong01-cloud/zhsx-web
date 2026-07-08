@@ -1,5 +1,8 @@
 import json
 import os
+import re
+import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -38,6 +41,11 @@ SENSOR_HISTORY = []
 HISTORY_LIMIT = 10
 KIMI_API_BASE = os.environ.get("MOONSHOT_API_BASE", "https://api.moonshot.cn/v1").rstrip("/")
 KIMI_MODEL = os.environ.get("KIMI_MODEL", "kimi-k2.6")
+KIMI_LOCK = threading.Lock()
+AI_HISTORY_LIMIT = 6
+AI_CHAT_HISTORY_LIMIT = 12
+SERVER_RUN_ID = uuid.uuid4().hex
+AI_SESSION_VERSION = "2"
 
 SENSORS = [
     {"name": "当前温度", "tag": "currentTemp", "unit": "℃", "icon": "thermometer"},
@@ -171,6 +179,164 @@ def send_device_command(api_tag, value):
     return False, data.get("Msg", "云平台未确认命令执行成功")
 
 
+def format_number(value):
+    return f"{value:g}"
+
+
+def get_latest_thresholds():
+    latest = SENSOR_HISTORY[-1]["values"] if SENSOR_HISTORY else {}
+    return numeric_value(latest.get("upperLimit")), numeric_value(latest.get("lowerLimit"))
+
+
+def apply_threshold_command(upper=None, lower=None):
+    current_upper, current_lower = get_latest_thresholds()
+    upper = current_upper if upper is None else upper
+    lower = current_lower if lower is None else lower
+
+    if upper is None or lower is None:
+        return False, "请同时说明上限和下限，例如：把上限调到 30，下限调到 20。"
+
+    if lower >= upper:
+        return False, "下限必须小于上限。"
+
+    if lower < -40 or upper > 100:
+        return False, "温度阈值范围应在 -40 到 100 ℃之间。"
+
+    upper_ok, upper_error = send_device_command(THRESHOLD_COMMANDS["upperLimit"], upper)
+    if not upper_ok:
+        return False, f"上限更新失败：{upper_error}"
+
+    lower_ok, lower_error = send_device_command(THRESHOLD_COMMANDS["lowerLimit"], lower)
+    if not lower_ok:
+        return False, f"下限更新失败：{lower_error}"
+
+    return True, f"已执行：上限 {format_number(upper)} ℃，下限 {format_number(lower)} ℃。"
+
+
+def parse_control_command(message):
+    text = message.replace(" ", "")
+    if not text:
+        return None
+
+    if re.search(r"(打开|开启|启动).*(设备|开关|执行器|actuator)", text, re.IGNORECASE):
+        return {"type": "device_switch", "enabled": True}
+
+    if re.search(r"(关闭|关掉|停止).*(设备|开关|执行器|actuator)", text, re.IGNORECASE):
+        return {"type": "device_switch", "enabled": False}
+
+    if not re.search(r"(阈值|上限|下限|温度)", text):
+        return None
+
+    upper = None
+    lower = None
+    upper_match = re.search(r"上限(?:温度)?(?:调到|设置为|设为|改为|=|：|:)?(-?\d+(?:\.\d+)?)", text)
+    lower_match = re.search(r"下限(?:温度)?(?:调到|设置为|设为|改为|=|：|:)?(-?\d+(?:\.\d+)?)", text)
+
+    if upper_match:
+        upper = float(upper_match.group(1))
+    if lower_match:
+        lower = float(lower_match.group(1))
+
+    if upper is None and lower is None:
+        both_match = re.search(r"(-?\d+(?:\.\d+)?)[℃度]?(?:到|~|-)(-?\d+(?:\.\d+)?)[℃度]?", text)
+        if both_match:
+            first = float(both_match.group(1))
+            second = float(both_match.group(2))
+            lower = min(first, second)
+            upper = max(first, second)
+
+    if upper is None and lower is None:
+        return None
+
+    return {"type": "thresholds", "upper": upper, "lower": lower}
+
+
+def extract_json_object(text):
+    text = (text or "").strip()
+    if not text:
+        return None
+
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"```$", "", text).strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+
+    try:
+        return json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+
+
+def normalize_ai_control_command(data):
+    if not isinstance(data, dict):
+        return None
+
+    action = data.get("action")
+    if action == "none":
+        return None
+
+    if action == "set_thresholds":
+        upper = numeric_value(data.get("upper"))
+        lower = numeric_value(data.get("lower"))
+        if upper is None and lower is None:
+            return None
+        return {"type": "thresholds", "upper": upper, "lower": lower}
+
+    if action == "device_switch":
+        enabled = data.get("enabled")
+        if isinstance(enabled, bool):
+            return {"type": "device_switch", "enabled": enabled}
+
+    return None
+
+
+def plan_control_command_with_ai(user_message):
+    system_prompt = (
+        "你是温室控制指令解析器，只输出 JSON，不要输出解释。"
+        "你只能返回以下三种动作："
+        '{"action":"set_thresholds","upper":数字或null,"lower":数字或null}，'
+        '{"action":"device_switch","enabled":true或false}，'
+        '{"action":"none"}。'
+        "当用户明确或模糊要求调温度阈值时，根据历史数据和常识给出合理上下限；"
+        "上限必须大于下限，范围 -40 到 100。"
+        "如果用户只是询问、分析、聊天，不要执行，返回 none。"
+    )
+    current_upper, current_lower = get_latest_thresholds()
+    context = (
+        f"当前上限={current_upper if current_upper is not None else '未知'}，"
+        f"当前下限={current_lower if current_lower is not None else '未知'}。\n"
+        f"最近历史：\n{format_history_for_ai()}"
+    )
+    answer, error = request_kimi(
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"{context}\n\n用户指令：{user_message}"},
+        ]
+    )
+    if error:
+        return None, error
+
+    data = extract_json_object(answer)
+    return normalize_ai_control_command(data), ""
+
+
+def execute_control_command(command):
+    if command["type"] == "device_switch":
+        ok, error = send_device_command(DEVICE_COMMANDS["actuator"], 1 if command["enabled"] else 0)
+        if not ok:
+            return False, f"设备控制失败：{error}"
+        return True, f"已执行：{'打开' if command['enabled'] else '关闭'}设备。"
+
+    if command["type"] == "thresholds":
+        return apply_threshold_command(command.get("upper"), command.get("lower"))
+
+    return False, "暂不支持这个控制指令。"
+
+
 def build_sensor_data():
     sensor_data = []
     has_error = False
@@ -213,7 +379,7 @@ def append_sensor_history(sensors, updated_at):
     del SENSOR_HISTORY[:-HISTORY_LIMIT]
 
 
-def format_history_for_ai():
+def format_history_for_ai(limit=AI_HISTORY_LIMIT):
     if not SENSOR_HISTORY:
         return "暂无历史记录。"
 
@@ -227,7 +393,7 @@ def format_history_for_ai():
         "m_wind_speed": "风速",
     }
     lines = []
-    for item in SENSOR_HISTORY[-HISTORY_LIMIT:]:
+    for item in SENSOR_HISTORY[-limit:]:
         values = "，".join(
             f"{labels.get(tag, tag)}={value}"
             for tag, value in item["values"].items()
@@ -237,24 +403,56 @@ def format_history_for_ai():
     return "\n".join(lines)
 
 
-def request_kimi(messages, temperature=1):
+def get_ai_chat_history():
+    if (
+        session.get("ai_server_run_id") != SERVER_RUN_ID
+        or session.get("ai_session_version") != AI_SESSION_VERSION
+    ):
+        session["ai_server_run_id"] = SERVER_RUN_ID
+        session["ai_session_version"] = AI_SESSION_VERSION
+        session.pop("ai_chat_history", None)
+        session.modified = True
+
+    cleaned = []
+    for item in session.get("ai_chat_history", []):
+        role = item.get("role")
+        content = (item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            cleaned.append({"role": role, "content": content})
+
+    if cleaned != session.get("ai_chat_history", []):
+        session["ai_chat_history"] = cleaned[-AI_CHAT_HISTORY_LIMIT:]
+        session.modified = True
+
+    return cleaned[-AI_CHAT_HISTORY_LIMIT:]
+
+
+def request_kimi(messages, wait_timeout=15):
     api_key = os.environ.get("MOONSHOT_API_KEY", "").strip()
     if not api_key:
         return "", "未配置 MOONSHOT_API_KEY 环境变量"
 
-    data, error = request_json(
-        f"{KIMI_API_BASE}/chat/completions",
-        method="POST",
-        bearer_token=api_key,
-        body={
-            "model": KIMI_MODEL,
-            "messages": messages,
-            "temperature": temperature,
-        },
-        timeout=35,
-    )
+    if not KIMI_LOCK.acquire(timeout=wait_timeout):
+        return "", "AI 正在分析上一条请求，请稍后再试"
+
+    try:
+        data, error = request_json(
+            f"{KIMI_API_BASE}/chat/completions",
+            method="POST",
+            bearer_token=api_key,
+            body={
+                "model": KIMI_MODEL,
+                "messages": messages,
+                "thinking": {"type": "disabled"},
+            },
+            timeout=35,
+        )
+    finally:
+        KIMI_LOCK.release()
 
     if error:
+        if "rate_limit_reached" in error or "HTTP 429" in error:
+            return "", "AI 请求太频繁，请稍后再试"
         return "", error
 
     choices = data.get("choices") or []
@@ -263,7 +461,6 @@ def request_kimi(messages, temperature=1):
 
     message = choices[0].get("message") or {}
     return message.get("content", "").strip(), ""
-
 
 def build_sensor_placeholders():
     return [
@@ -469,13 +666,13 @@ def ai_advice_api():
             "role": "system",
             "content": (
                 "你是智慧农业温室监测助手。请根据最近传感器历史数据，"
-                "用中文给出简短、可执行的环境建议。回复控制在 120 字以内，"
+                "用中文给出简短、可执行的环境建议。回复控制在 80 字以内，"
                 "重点关注温度、CO2、风速、报警状态。"
             ),
         },
         {
             "role": "user",
-            "content": f"最近 {HISTORY_LIMIT} 次历史记录如下：\n{format_history_for_ai()}",
+            "content": f"最近 {AI_HISTORY_LIMIT} 次历史记录如下：\n{format_history_for_ai()}",
         },
     ]
     answer, error = request_kimi(messages)
@@ -495,27 +692,56 @@ def ai_chat_api():
     if not user_message:
         return jsonify({"ok": False, "error": "请输入问题"}), 400
 
-    chat_history = session.get("ai_chat_history", [])[-8:]
+    chat_history = get_ai_chat_history()
+    control_command = parse_control_command(user_message)
+    planner_error = ""
+    if not control_command:
+        control_command, planner_error = plan_control_command_with_ai(user_message)
+
+    if control_command:
+        ok, answer = execute_control_command(control_command)
+        chat_history.extend(
+            [
+                {"role": "user", "content": user_message},
+                {"role": "assistant", "content": answer},
+            ]
+        )
+        session["ai_chat_history"] = chat_history[-AI_CHAT_HISTORY_LIMIT:]
+        session["ai_server_run_id"] = SERVER_RUN_ID
+        session["ai_session_version"] = AI_SESSION_VERSION
+        session.modified = True
+        status = 200 if ok else 400
+        return jsonify({"ok": ok, "answer": answer, "executed": ok}), status
+
     messages = [
         {
             "role": "system",
             "content": (
                 "你是嵌入在温室环境监测系统里的 AI 助手。"
                 "你能读取最近的传感器历史记录，并回答用户关于温室环境、数据趋势、异常原因和处理建议的问题。"
-                "回答要具体、简洁，优先结合数据，不要编造没有的数据。"
+                "如果用户希望你执行调阈值或开关设备，但系统没有执行，请说明需要更明确的控制意图。"
+                "回答要具体、简洁，优先结合数据，不要编造没有的数据。回复尽量控制在 120 字以内。"
             ),
         },
         {
             "role": "user",
-            "content": f"当前系统最近 {HISTORY_LIMIT} 次历史记录：\n{format_history_for_ai()}",
+            "content": f"当前系统最近 {AI_HISTORY_LIMIT} 次历史记录：\n{format_history_for_ai()}",
         },
     ]
     messages.extend(chat_history)
+    if planner_error:
+        messages.append({"role": "system", "content": f"控制意图解析暂不可用：{planner_error}"})
     messages.append({"role": "user", "content": user_message})
 
-    answer, error = request_kimi(messages, temperature=1)
+    answer, error = request_kimi(messages)
     if error:
         return jsonify({"ok": False, "error": error}), 502
+    if not answer:
+        answer, error = request_kimi(messages)
+        if error:
+            return jsonify({"ok": False, "error": error}), 502
+        if not answer:
+            return jsonify({"ok": False, "error": "AI 暂时没有生成内容，请换个问题再试"}), 502
 
     chat_history.extend(
         [
@@ -523,10 +749,24 @@ def ai_chat_api():
             {"role": "assistant", "content": answer},
         ]
     )
-    session["ai_chat_history"] = chat_history[-8:]
+    session["ai_chat_history"] = chat_history[-AI_CHAT_HISTORY_LIMIT:]
+    session["ai_server_run_id"] = SERVER_RUN_ID
+    session["ai_session_version"] = AI_SESSION_VERSION
     session.modified = True
 
     return jsonify({"ok": True, "answer": answer})
+
+
+@app.route("/api/ai-reset", methods=["POST"])
+def ai_reset_api():
+    if not session.get("username"):
+        return jsonify({"ok": False, "error": "未登录"}), 401
+
+    session.pop("ai_chat_history", None)
+    session["ai_server_run_id"] = SERVER_RUN_ID
+    session["ai_session_version"] = AI_SESSION_VERSION
+    session.modified = True
+    return jsonify({"ok": True})
 
 
 @app.route("/profile", methods=["GET", "POST"])

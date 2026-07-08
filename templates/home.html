@@ -858,7 +858,7 @@
         position: fixed;
         right: 28px;
         bottom: 28px;
-        z-index: 30;
+        z-index: 1000;
     }
 
     .ai-toggle {
@@ -882,7 +882,7 @@
         margin-bottom: 14px;
         border-radius: 18px;
         overflow: hidden;
-        background: rgba(255, 255, 255, 0.96);
+        background: #ffffff;
         border: 1px solid rgba(15, 118, 82, 0.12);
         box-shadow: 0 28px 70px rgba(0, 70, 45, 0.22);
         display: none;
@@ -934,6 +934,19 @@
         border: 1px solid rgba(16, 185, 129, 0.12);
         font-size: 13px;
         line-height: 1.55;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ai-advice.loading::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #10b981, transparent);
+        animation: ai-progress 1.1s ease-in-out infinite;
     }
 
     .ai-messages {
@@ -944,6 +957,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
+        background: #ffffff;
     }
 
     .ai-msg {
@@ -959,12 +973,41 @@
         align-self: flex-start;
         color: #123c2c;
         background: #eef7f2;
+        border: 1px solid rgba(15, 118, 82, 0.06);
+    }
+
+    .ai-msg.thinking {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .ai-dots {
+        display: inline-flex;
+        gap: 4px;
+    }
+
+    .ai-dots i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: ai-dot 0.9s ease-in-out infinite;
+    }
+
+    .ai-dots i:nth-child(2) {
+        animation-delay: 0.15s;
+    }
+
+    .ai-dots i:nth-child(3) {
+        animation-delay: 0.30s;
     }
 
     .ai-msg.user {
         align-self: flex-end;
         color: #ffffff;
         background: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.28);
     }
 
     .ai-form {
@@ -972,6 +1015,7 @@
         display: flex;
         gap: 8px;
         border-top: 1px solid rgba(15, 118, 82, 0.10);
+        background: #ffffff;
     }
 
     .ai-input {
@@ -994,6 +1038,39 @@
         background: #10b981;
         font-weight: 800;
         cursor: pointer;
+    }
+
+    .ai-send.loading {
+        opacity: 0.8;
+        pointer-events: none;
+    }
+
+    .ai-input:disabled,
+    .ai-send:disabled {
+        opacity: 0.72;
+        cursor: not-allowed;
+    }
+
+    @keyframes ai-progress {
+        0% {
+            transform: translateX(-100%);
+        }
+
+        100% {
+            transform: translateX(100%);
+        }
+    }
+
+    @keyframes ai-dot {
+        0%, 100% {
+            transform: translateY(0);
+            opacity: 0.45;
+        }
+
+        50% {
+            transform: translateY(-4px);
+            opacity: 1;
+        }
     }
 
     @keyframes refresh-spin {
@@ -1286,11 +1363,11 @@
         <div class="ai-head">
             <div>
                 <strong>AI 温室助手</strong>
-                <span>读取历史记录，实时给出建议</span>
+                <span>按需读取历史记录，给出建议</span>
             </div>
             <button class="ai-close" id="aiClose" type="button">×</button>
         </div>
-        <div class="ai-advice" id="aiAdvice">正在等待传感器历史数据...</div>
+        <div class="ai-advice" id="aiAdvice">需要分析时，请直接发送你的问题。</div>
         <div class="ai-messages" id="aiMessages">
             <div class="ai-msg assistant">你好，我会结合最近 10 次历史记录，帮你分析温室环境并给出处理建议。</div>
         </div>
@@ -1316,12 +1393,25 @@
     const aiMessages = document.getElementById("aiMessages");
     const aiForm = document.getElementById("aiForm");
     const aiInput = document.getElementById("aiInput");
+    const aiSend = document.querySelector(".ai-send");
     const normalStatusText = "数据获取正常";
     const autoRefreshMs = 10000;
-    const aiAdviceRefreshMs = 30000;
     const historyColumns = ["currentTemp", "upperLimit", "lowerLimit", "alarm", "m_pressure", "m_co2", "m_wind_speed"];
     let isRefreshing = false;
     let lastAdviceAt = 0;
+    let isAdviceLoading = false;
+    let isChatLoading = false;
+
+    function updateAiControls() {
+        if (aiInput) {
+            aiInput.disabled = isChatLoading;
+        }
+        if (aiSend) {
+            aiSend.disabled = isChatLoading;
+            aiSend.classList.toggle("loading", isChatLoading);
+            aiSend.textContent = isChatLoading ? "中..." : "发送";
+        }
+    }
 
     function playCardAnimation() {
         document.querySelectorAll(".metric-card").forEach((card, index) => {
@@ -1529,29 +1619,39 @@
         updateHistoryView(data.history || []);
     }
 
-    function appendAiMessage(role, content) {
+    function appendAiMessage(role, content, thinking = false) {
         if (!aiMessages) {
             return;
         }
 
         const item = document.createElement("div");
-        item.className = `ai-msg ${role}`;
-        item.textContent = content;
+        item.className = `ai-msg ${role}${thinking ? " thinking" : ""}`;
+        if (thinking) {
+            item.innerHTML = `${content}<span class="ai-dots"><i></i><i></i><i></i></span>`;
+        } else {
+            item.textContent = content;
+        }
         aiMessages.appendChild(item);
         aiMessages.scrollTop = aiMessages.scrollHeight;
+        return item;
     }
 
     async function refreshAiAdvice(force = false) {
         if (!aiAdvice) {
             return;
         }
+        if (isAdviceLoading || isChatLoading) {
+            return;
+        }
 
         const now = Date.now();
-        if (!force && now - lastAdviceAt < aiAdviceRefreshMs) {
+        if (!force && now - lastAdviceAt < 60000) {
             return;
         }
 
         lastAdviceAt = now;
+        isAdviceLoading = true;
+        aiAdvice.classList.add("loading");
         aiAdvice.textContent = "AI 正在分析最近历史记录...";
 
         try {
@@ -1568,12 +1668,27 @@
             aiAdvice.textContent = data.advice;
         } catch (error) {
             aiAdvice.textContent = error.message;
+        } finally {
+            isAdviceLoading = false;
+            aiAdvice.classList.remove("loading");
         }
     }
 
     async function sendAiMessage(message) {
+        if (isChatLoading) {
+            appendAiMessage("assistant", "上一条问题还在分析，请稍后再发送。");
+            return;
+        }
+
+        const wasAdviceLoading = isAdviceLoading;
+        isAdviceLoading = false;
+        isChatLoading = true;
         appendAiMessage("user", message);
-        appendAiMessage("assistant", "正在结合历史记录思考...");
+        const pending = appendAiMessage("assistant", "正在结合历史记录思考", true);
+        updateAiControls();
+        if (wasAdviceLoading && aiAdvice) {
+            aiAdvice.textContent = "正在优先回答你的问题...";
+        }
 
         try {
             const response = await fetch("{{ url_for('ai_chat_api') }}", {
@@ -1585,18 +1700,24 @@
                 body: JSON.stringify({ message }),
             });
             const data = await response.json();
-            const pending = aiMessages.querySelector(".ai-msg.assistant:last-child");
 
             if (!response.ok || !data.ok) {
-                throw new Error(data.error || "AI 回复失败");
+                throw new Error(data.answer || data.error || "AI 回复失败");
             }
 
+            pending.classList.remove("thinking");
             pending.textContent = data.answer;
+            if (data.executed) {
+                refreshSensorData();
+            }
         } catch (error) {
-            const pending = aiMessages.querySelector(".ai-msg.assistant:last-child");
             if (pending) {
+                pending.classList.remove("thinking");
                 pending.textContent = error.message;
             }
+        } finally {
+            isChatLoading = false;
+            updateAiControls();
         }
     }
 
@@ -1641,7 +1762,6 @@
             }
 
             await refreshHistory();
-            refreshAiAdvice();
             playCardAnimation();
         } catch (error) {
             console.error(error);
@@ -1668,9 +1788,6 @@
     if (aiToggle && aiPanel) {
         aiToggle.addEventListener("click", () => {
             aiPanel.classList.toggle("open");
-            if (aiPanel.classList.contains("open")) {
-                refreshAiAdvice(true);
-            }
         });
     }
 

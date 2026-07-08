@@ -551,9 +551,13 @@
                     <span class="nav-icon nav-cloud"></span>
                     <span>云平台授权</span>
                 </a>
-                <a class="nav-item" href="{{ url_for('home') }}">
+                <a class="nav-item {{ 'active' if request.endpoint == 'hardware' else '' }}" href="{{ url_for('hardware') }}">
                     <span class="nav-icon nav-device"></span>
                     <span>设备管理</span>
+                </a>
+                <a class="nav-item {{ 'active' if request.endpoint == 'strategy' else '' }}" href="{{ url_for('strategy') }}">
+                    <span class="nav-icon nav-device"></span>
+                    <span>策略设置</span>
                 </a>
             </nav>
 
