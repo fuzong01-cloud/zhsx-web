@@ -1320,7 +1320,7 @@
     <div class="history-header">
         <div class="history-title">
             <h2>数据趋势</h2>
-            <p>自动记录最近 10 次采集数据，展示核心指标变化趋势</p>
+            <p>每 5 秒记录一次温度数据，展示历史趋势与统计结果</p>
         </div>
         <div class="history-badge" id="historyCount">记录 0/10</div>
     </div>
@@ -1330,10 +1330,10 @@
     </div>
 
     <div class="trend-stats" id="trendStats">
-        <div class="trend-stat"><span>最新温度</span><strong>--</strong><em>等待数据</em></div>
-        <div class="trend-stat"><span>平均温度</span><strong>--</strong><em>最近 10 次</em></div>
-        <div class="trend-stat"><span>CO₂ 峰值</span><strong>--</strong><em>ppm</em></div>
-        <div class="trend-stat"><span>风速波动</span><strong>--</strong><em>m/s</em></div>
+        <div class="trend-stat"><span>数据条数</span><strong>--</strong><em>条</em></div>
+        <div class="trend-stat"><span>最高温</span><strong>--</strong><em>℃</em></div>
+        <div class="trend-stat"><span>最低温</span><strong>--</strong><em>℃</em></div>
+        <div class="trend-stat"><span>平均温</span><strong>--</strong><em>℃</em></div>
     </div>
 
     <div class="history-table-wrap">
@@ -1395,7 +1395,7 @@
     const aiInput = document.getElementById("aiInput");
     const aiSend = document.querySelector(".ai-send");
     const normalStatusText = "数据获取正常";
-    const autoRefreshMs = 10000;
+    const autoRefreshMs = 5000;
     const historyColumns = ["currentTemp", "upperLimit", "lowerLimit", "alarm", "m_pressure", "m_co2", "m_wind_speed"];
     let isRefreshing = false;
     let lastAdviceAt = 0;
@@ -1474,23 +1474,27 @@
         return valid.reduce((total, value) => total + value, 0) / valid.length;
     }
 
-    function updateTrendStats(history) {
+    function formatStatNumber(value) {
+        return value === undefined || value === null ? "--" : Number(value).toFixed(1);
+    }
+
+    function updateTrendStats(history, stats = null) {
         if (!trendStats) {
             return;
         }
 
-        const latest = history[history.length - 1]?.values || {};
         const temps = history.map((item) => item.values.currentTemp).filter((value) => value !== undefined && value !== null);
-        const co2Values = history.map((item) => item.values.m_co2).filter((value) => value !== undefined && value !== null);
-        const windValues = history.map((item) => item.values.m_wind_speed).filter((value) => value !== undefined && value !== null);
-        const windSpread = windValues.length ? Math.max(...windValues) - Math.min(...windValues) : null;
-        const avgTemp = average(temps);
+        const maxTemp = stats ? stats.maxTemp : (temps.length ? Math.max(...temps) : null);
+        const minTemp = stats ? stats.minTemp : (temps.length ? Math.min(...temps) : null);
+        const avgTemp = stats ? stats.avgTemp : average(temps);
+        const count = stats ? stats.count : temps.length;
+        const alert = stats?.alert || "等待历史数据";
 
         trendStats.innerHTML = `
-            <div class="trend-stat"><span>最新温度</span><strong>${latest.currentTemp ?? "--"}</strong><em>℃</em></div>
-            <div class="trend-stat"><span>平均温度</span><strong>${avgTemp === null ? "--" : avgTemp.toFixed(1)}</strong><em>最近 10 次</em></div>
-            <div class="trend-stat"><span>CO₂ 峰值</span><strong>${co2Values.length ? Math.max(...co2Values) : "--"}</strong><em>ppm</em></div>
-            <div class="trend-stat"><span>风速波动</span><strong>${windSpread === null ? "--" : windSpread.toFixed(1)}</strong><em>m/s</em></div>
+            <div class="trend-stat"><span>数据条数</span><strong>${count ?? 0}</strong><em>条</em></div>
+            <div class="trend-stat"><span>最高温</span><strong>${formatStatNumber(maxTemp)}</strong><em>℃</em></div>
+            <div class="trend-stat"><span>最低温</span><strong>${formatStatNumber(minTemp)}</strong><em>℃</em></div>
+            <div class="trend-stat"><span>平均温</span><strong>${formatStatNumber(avgTemp)}</strong><em>${alert}</em></div>
         `;
     }
 
@@ -1581,12 +1585,12 @@
         `;
     }
 
-    function updateHistoryView(history) {
+    function updateHistoryView(history, stats = null) {
         if (historyCount) {
-            historyCount.textContent = `记录 ${history.length}/10`;
+            historyCount.textContent = `记录 ${stats?.count ?? history.length} 条`;
         }
 
-        updateTrendStats(history);
+        updateTrendStats(history, stats);
         renderTrendSvg(history);
 
         if (!historyTableBody) {
@@ -1616,7 +1620,7 @@
         }
 
         const data = await response.json();
-        updateHistoryView(data.history || []);
+        updateHistoryView(data.history || [], data.stats || null);
     }
 
     function appendAiMessage(role, content, thinking = false) {

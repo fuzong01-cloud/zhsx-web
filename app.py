@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sqlite3
 import threading
 import uuid
 from datetime import datetime
@@ -17,6 +18,7 @@ app.secret_key = "flask-login-home-demo"
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
+DB_PATH = BASE_DIR / "greenhouse.db"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -74,6 +76,80 @@ USERS = {
         "avatar": "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=900&q=80",
     }
 }
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    with get_db() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                account TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                name TEXT NOT NULL,
+                student_id TEXT NOT NULL,
+                avatar TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS temperature_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                current_temp REAL,
+                upper_limit REAL,
+                lower_limit REAL,
+                alarm REAL,
+                pressure REAL,
+                co2 REAL,
+                wind_speed REAL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS actuator_status (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                status INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        for account, user in USERS.items():
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO users (account, password, name, student_id, avatar)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (account, user["password"], user["name"], user["student_id"], user["avatar"]),
+            )
+
+
+def load_users_from_db():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT account, password, name, student_id, avatar FROM users"
+        ).fetchall()
+
+    for row in rows:
+        USERS[row["account"]] = {
+            "password": row["password"],
+            "name": row["name"],
+            "student_id": row["student_id"],
+            "avatar": row["avatar"],
+        }
+
+
+init_db()
+load_users_from_db()
 
 
 @app.context_processor
@@ -184,6 +260,20 @@ def format_number(value):
 
 
 def get_latest_thresholds():
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT upper_limit, lower_limit
+            FROM temperature_records
+            WHERE upper_limit IS NOT NULL OR lower_limit IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+
+    if row:
+        return numeric_value(row["upper_limit"]), numeric_value(row["lower_limit"])
+
     latest = SENSOR_HISTORY[-1]["values"] if SENSOR_HISTORY else {}
     return numeric_value(latest.get("upperLimit")), numeric_value(latest.get("lowerLimit"))
 
@@ -365,6 +455,51 @@ def numeric_value(value):
         return None
 
 
+def insert_temperature_record(values, updated_at):
+    with get_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO temperature_records (
+                current_temp, upper_limit, lower_limit, alarm, pressure, co2, wind_speed, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                values.get("currentTemp"),
+                values.get("upperLimit"),
+                values.get("lowerLimit"),
+                values.get("alarm"),
+                values.get("m_pressure"),
+                values.get("m_co2"),
+                values.get("m_wind_speed"),
+                updated_at,
+            ),
+        )
+
+
+def get_latest_actuator_status():
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT status FROM actuator_status ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+
+    return None if row is None else int(row["status"])
+
+
+def insert_actuator_status(name="actuator", status=None, created_at=None):
+    if status is None:
+        status = get_latest_actuator_status()
+    if status is None:
+        return
+
+    created_at = created_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO actuator_status (name, status, created_at) VALUES (?, ?, ?)",
+            (name, int(status), created_at),
+        )
+
+
 def append_sensor_history(sensors, updated_at):
     values = {}
     for sensor in sensors:
@@ -377,12 +512,89 @@ def append_sensor_history(sensors, updated_at):
 
     SENSOR_HISTORY.append({"time": updated_at, "values": values})
     del SENSOR_HISTORY[:-HISTORY_LIMIT]
+    insert_temperature_record(values, updated_at)
+    insert_actuator_status(created_at=updated_at)
+
+
+def row_to_history_item(row):
+    values = {
+        "currentTemp": row["current_temp"],
+        "upperLimit": row["upper_limit"],
+        "lowerLimit": row["lower_limit"],
+        "alarm": row["alarm"],
+        "m_pressure": row["pressure"],
+        "m_co2": row["co2"],
+        "m_wind_speed": row["wind_speed"],
+    }
+    return {
+        "id": row["id"],
+        "time": row["created_at"],
+        "values": {key: value for key, value in values.items() if value is not None},
+    }
+
+
+def get_temperature_history(limit=HISTORY_LIMIT):
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, current_temp, upper_limit, lower_limit, alarm, pressure, co2, wind_speed, created_at
+            FROM temperature_records
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [row_to_history_item(row) for row in reversed(rows)]
+
+
+def get_temperature_stats():
+    with get_db() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(current_temp) AS count,
+                MAX(current_temp) AS max_temp,
+                MIN(current_temp) AS min_temp,
+                AVG(current_temp) AS avg_temp
+            FROM temperature_records
+            WHERE current_temp IS NOT NULL
+            """
+        ).fetchone()
+
+    return {
+        "count": int(row["count"] or 0),
+        "maxTemp": row["max_temp"],
+        "minTemp": row["min_temp"],
+        "avgTemp": row["avg_temp"],
+    }
+
+
+def build_temperature_alert(history):
+    if not history:
+        return "等待历史数据"
+
+    latest = history[-1]["values"]
+    temp = latest.get("currentTemp")
+    upper = latest.get("upperLimit")
+    lower = latest.get("lowerLimit")
+    if temp is None:
+        return "暂无温度数据"
+    if upper is not None and temp > upper:
+        return "高温超限"
+    if lower is not None and temp < lower:
+        return "低温超限"
+
+    temps = [item["values"].get("currentTemp") for item in history[-3:]]
+    temps = [value for value in temps if value is not None]
+    if len(temps) >= 3 and temps[-1] - temps[0] >= 2:
+        return "升温较快"
+    if len(temps) >= 3 and temps[0] - temps[-1] >= 2:
+        return "降温较快"
+    return "状态平稳"
 
 
 def format_history_for_ai(limit=AI_HISTORY_LIMIT):
-    if not SENSOR_HISTORY:
-        return "暂无历史记录。"
-
     labels = {
         "currentTemp": "当前温度",
         "upperLimit": "上限温度",
@@ -392,8 +604,12 @@ def format_history_for_ai(limit=AI_HISTORY_LIMIT):
         "m_co2": "二氧化碳",
         "m_wind_speed": "风速",
     }
+    history = get_temperature_history(limit)
+    if not history:
+        return "暂无历史记录。"
+
     lines = []
-    for item in SENSOR_HISTORY[-limit:]:
+    for item in history[-limit:]:
         values = "，".join(
             f"{labels.get(tag, tag)}={value}"
             for tag, value in item["values"].items()
@@ -549,6 +765,20 @@ def register():
                 "student_id": student_id,
                 "avatar": url_for("static", filename=f"uploads/{filename}"),
             }
+            with get_db() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO users (account, password, name, student_id, avatar)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        username,
+                        password,
+                        name,
+                        student_id,
+                        USERS[username]["avatar"],
+                    ),
+                )
             message = "注册成功，请返回登录。"
             message_type = "success"
 
@@ -597,7 +827,10 @@ def history_api():
     if not session.get("username"):
         return jsonify({"ok": False, "error": "未登录"}), 401
 
-    return jsonify({"ok": True, "history": SENSOR_HISTORY[-HISTORY_LIMIT:]})
+    history = get_temperature_history(HISTORY_LIMIT)
+    stats = get_temperature_stats()
+    stats["alert"] = build_temperature_alert(history)
+    return jsonify({"ok": True, "history": history, "stats": stats})
 
 
 @app.route("/hardware")
@@ -624,6 +857,8 @@ def device_switch_api():
     payload = request.get_json(silent=True) or {}
     enabled = bool(payload.get("enabled"))
     ok, error = send_device_command(DEVICE_COMMANDS["actuator"], 1 if enabled else 0)
+    if ok:
+        insert_actuator_status(status=1 if enabled else 0)
     return jsonify({"ok": ok, "error": error, "enabled": enabled})
 
 
@@ -806,6 +1041,16 @@ def profile():
                 filename = secure_filename(f"{username}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}")
                 photo.save(UPLOAD_DIR / filename)
                 user["avatar"] = url_for("static", filename=f"uploads/{filename}")
+
+            with get_db() as conn:
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET password = ?, name = ?, student_id = ?, avatar = ?
+                    WHERE account = ?
+                    """,
+                    (user["password"], user["name"], user["student_id"], user["avatar"], username),
+                )
 
             message = "个人信息修改成功。"
             message_type = "success"
