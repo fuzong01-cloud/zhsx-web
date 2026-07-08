@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}设备管理{% endblock %}
+{% block page_title %}设备管理{% endblock %}
+
+{% block head %}
+<style>
+    .hardware-panel { padding: 28px; }
+    .hardware-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .hardware-head h2 { margin: 0; color: #0f2f24; font-size: 24px; }
+    .hardware-head p { margin: 8px 0 0; color: #6b8177; font-size: 14px; }
+    .switch-btn { height: 44px; padding: 0 22px; border: none; border-radius: 13px; color: white; background: #10b981; font-weight: 800; cursor: pointer; }
+    .switch-btn.off { background: #ef4444; }
+    .hardware-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .data-card { min-height: 130px; padding: 18px; border-radius: 18px; background: rgba(255,255,255,.92); border: 1px solid rgba(15,118,82,.12); box-shadow: 0 12px 28px rgba(0,80,50,.07); }
+    .data-card span { color: #7c9188; font-size: 13px; font-family: Consolas, monospace; }
+    .data-card h3 { margin: 10px 0 20px; color: #0f2f24; font-size: 16px; }
+    .data-card strong { color: #063f2c; font-size: 30px; }
+    .data-card em { color: #6f8b7e; font-style: normal; margin-left: 5px; }
+    .state-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .state-pill { padding: 10px 14px; border-radius: 999px; background: rgba(16,185,129,.10); color: #0f7049; font-weight: 800; font-size: 13px; }
+    .state-pill.warn { background: #fff4df; color: #a65f00; }
+    .notice { margin-top: 18px; color: #2f80ed; font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="hardware-panel section-card">
+    <div class="hardware-head">
+        <div>
+            <h2>传感器数据展示</h2>
+            <p>每隔 5 秒自动获取一次传感器数据，并显示报警与设备开关状态</p>
+        </div>
+        <button class="switch-btn" id="deviceSwitch" type="button">打开设备</button>
+    </div>
+
+    <div class="state-row">
+        <div class="state-pill" id="alarmState">温度报警：--</div>
+        <div class="state-pill" id="deviceState">设备开关：关闭</div>
+        <div class="state-pill {{ '' if cloud_authorized else 'warn' }}">云平台：{{ '已授权' if cloud_authorized else '未授权' }}</div>
+    </div>
+
+    <div class="hardware-grid" id="hardwareGrid"></div>
+    <div class="notice" id="hardwareNotice">等待数据加载...</div>
+</section>
+
+<script>
+    const hardwareGrid = document.getElementById("hardwareGrid");
+    const hardwareNotice = document.getElementById("hardwareNotice");
+    const alarmState = document.getElementById("alarmState");
+    const deviceState = document.getElementById("deviceState");
+    const deviceSwitch = document.getElementById("deviceSwitch");
+    let deviceEnabled = false;
+
+    function renderHardware(sensors) {
+        hardwareGrid.innerHTML = sensors.map((sensor) => `
+            <div class="data-card">
+                <span>${sensor.tag}</span>
+                <h3>${sensor.name}</h3>
+                <strong>${sensor.value}</strong><em>${sensor.unit || ""}</em>
+            </div>
+        `).join("");
+
+        const alarm = sensors.find((sensor) => sensor.tag === "alarm");
+        alarmState.textContent = `温度报警：${alarm ? alarm.value : "--"}`;
+        alarmState.classList.toggle("warn", alarm && String(alarm.value) !== "0");
+    }
+
+    async function loadHardwareData() {
+        try {
+            const response = await fetch("{{ url_for('sensor_api') }}", { cache: "no-store" });
+            const data = await response.json();
+            renderHardware(data.sensors || []);
+            hardwareNotice.textContent = `最新数据：${data.updated_at || "--"}`;
+        } catch (error) {
+            hardwareNotice.textContent = "数据获取失败";
+        }
+    }
+
+    deviceSwitch.addEventListener("click", async () => {
+        const next = !deviceEnabled;
+        deviceSwitch.disabled = true;
+        try {
+            const response = await fetch("{{ url_for('device_switch_api') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ enabled: next }),
+            });
+            const data = await response.json();
+            if (!data.ok) throw new Error(data.error || "设备控制失败");
+            deviceEnabled = next;
+            deviceState.textContent = `设备开关：${deviceEnabled ? "开启" : "关闭"}`;
+            deviceSwitch.textContent = deviceEnabled ? "关闭设备" : "打开设备";
+            deviceSwitch.classList.toggle("off", deviceEnabled);
+        } catch (error) {
+            hardwareNotice.textContent = error.message;
+        } finally {
+            deviceSwitch.disabled = false;
+        }
+    });
+
+    loadHardwareData();
+    setInterval(loadHardwareData, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}策略设置{% endblock %}
+{% block page_title %}策略设置{% endblock %}
+
+{% block head %}
+<style>
+    .strategy-panel { padding: 28px; }
+    .strategy-title h2 { margin: 0; color: #0f2f24; font-size: 24px; }
+    .strategy-title p { margin: 8px 0 24px; color: #6b8177; font-size: 14px; }
+    .strategy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 22px; }
+    .limit-card { padding: 20px; border-radius: 18px; background: rgba(255,255,255,.92); border: 1px solid rgba(15,118,82,.12); }
+    .limit-card span { color: #7c9188; font-size: 13px; }
+    .limit-card strong { display: block; margin-top: 10px; color: #063f2c; font-size: 34px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    label { display: block; margin-bottom: 8px; color: #254d3a; font-weight: 800; }
+    input { width: 100%; height: 46px; padding: 0 13px; border: 1px solid rgba(15,118,82,.14); border-radius: 12px; outline: none; background: #f8fcfa; font-size: 15px; }
+    input:focus { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,.13); }
+    .save-btn { height: 46px; margin-top: 20px; padding: 0 26px; border: none; border-radius: 13px; color: white; background: #10b981; font-weight: 800; cursor: pointer; }
+    .message { margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px; background: #eaf5ff; color: #2f80ed; }
+    .message.error { background: #ffe4e6; color: #9f1239; }
+    @media (max-width: 760px) { .strategy-grid, .form-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="strategy-panel section-card">
+    <div class="strategy-title">
+        <h2>策略设置</h2>
+        <p>显示当前云平台与 LCD 屏设定的限值，并通过 Web 端更新阈值</p>
+    </div>
+
+    <div class="strategy-grid">
+        <div class="limit-card">
+            <span>当前上限温度</span>
+            <strong id="upperValue">-- ℃</strong>
+        </div>
+        <div class="limit-card">
+            <span>当前下限温度</span>
+            <strong id="lowerValue">-- ℃</strong>
+        </div>
+    </div>
+
+    <form id="strategyForm">
+        <div class="form-grid">
+            <div>
+                <label for="upperInput">设置上限温度</label>
+                <input id="upperInput" name="upperLimit" type="number" step="0.1" required>
+            </div>
+            <div>
+                <label for="lowerInput">设置下限温度</label>
+                <input id="lowerInput" name="lowerLimit" type="number" step="0.1" required>
+            </div>
+        </div>
+        <button class="save-btn" type="submit">更新到云平台和 LCD 屏</button>
+        <div class="message" id="strategyMessage">等待读取当前阈值...</div>
+    </form>
+</section>
+
+<script>
+    const upperValue = document.getElementById("upperValue");
+    const lowerValue = document.getElementById("lowerValue");
+    const upperInput = document.getElementById("upperInput");
+    const lowerInput = document.getElementById("lowerInput");
+    const strategyForm = document.getElementById("strategyForm");
+    const strategyMessage = document.getElementById("strategyMessage");
+
+    async function loadLimits() {
+        try {
+            const response = await fetch("{{ url_for('sensor_api') }}", { cache: "no-store" });
+            const data = await response.json();
+            const upper = (data.sensors || []).find((sensor) => sensor.tag === "upperLimit");
+            const lower = (data.sensors || []).find((sensor) => sensor.tag === "lowerLimit");
+            upperValue.textContent = `${upper ? upper.value : "--"} ℃`;
+            lowerValue.textContent = `${lower ? lower.value : "--"} ℃`;
+            upperInput.value = upper && upper.value !== "--" ? upper.value : "";
+            lowerInput.value = lower && lower.value !== "--" ? lower.value : "";
+            strategyMessage.textContent = "当前阈值读取完成。";
+            strategyMessage.classList.remove("error");
+        } catch (error) {
+            strategyMessage.textContent = "当前阈值读取失败。";
+            strategyMessage.classList.add("error");
+        }
+    }
+
+    strategyForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const upper = Number(upperInput.value);
+        const lower = Number(lowerInput.value);
+
+        if (!Number.isFinite(upper) || !Number.isFinite(lower)) {
+            strategyMessage.textContent = "阈值必须是数字。";
+            strategyMessage.classList.add("error");
+            return;
+        }
+
+        if (lower >= upper) {
+            strategyMessage.textContent = "下限必须小于上限。";
+            strategyMessage.classList.add("error");
+            return;
+        }
+
+        strategyMessage.textContent = "正在更新阈值...";
+        strategyMessage.classList.remove("error");
+
+        try {
+            const response = await fetch("{{ url_for('thresholds_api') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ upperLimit: upper, lowerLimit: lower }),
+            });
+            const data = await response.json();
+            if (!data.ok) throw new Error(data.error || "阈值更新失败");
+            upperValue.textContent = `${data.upperLimit} ℃`;
+            lowerValue.textContent = `${data.lowerLimit} ℃`;
+            strategyMessage.textContent = "阈值已更新到云平台和 LCD 屏，请观察执行器状态。";
+        } catch (error) {
+            strategyMessage.textContent = error.message;
+            strategyMessage.classList.add("error");
+        }
+    });
+
+    loadLimits();
+</script>
+{% endblock %}
