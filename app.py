@@ -412,19 +412,30 @@ def normalize_ai_control_command(data):
     if action == "device_switch":
         enabled = data.get("enabled")
         if isinstance(enabled, bool):
-            return {"type": "device_switch", "enabled": enabled}
+            command = {"type": "device_switch", "enabled": enabled}
+            api_tag = data.get("api_tag")
+            if isinstance(api_tag, str) and api_tag.strip():
+                command["api_tag"] = api_tag.strip()
+            return command
 
     return None
 
 
-def plan_control_command_with_ai(user_message):
+def plan_control_command_with_ai(user_message, device_id=NLE_DEVICE_ID):
+    profile = get_device_profile(device_id) or get_device_profile(NLE_DEVICE_ID)
+    actuator_text = "、".join(
+        f"{item['name']} api_tag={item['tag']}" for item in profile.get("actuators", [])
+    )
     system_prompt = (
         "你是温室控制指令解析器，只输出 JSON，不要输出解释。"
         "你只能返回以下三种动作："
         '{"action":"set_thresholds","upper":数字或null,"lower":数字或null}，'
-        '{"action":"device_switch","enabled":true或false}，'
+        '{"action":"device_switch","enabled":true或false,"api_tag":"执行器api_tag"}，'
         '{"action":"none"}。'
+        f"当前界面设备是 {profile['name']}（{device_id}），可控制执行器：{actuator_text}。"
+        "控制执行器时必须从可控制执行器里选择 api_tag。"
         "当用户明确或模糊要求调温度阈值时，根据历史数据和常识给出合理上下限；"
+        "只有当前界面设备支持 upperLimit/lowerLimit 时才返回 set_thresholds；"
         "上限必须大于下限，范围 -40 到 100。"
         "如果用户只是询问、分析、聊天，不要执行，返回 none。"
     )
@@ -1027,11 +1038,19 @@ def ai_advice_api():
                 "重点关注温度、CO2、风速、报警状态。"
             ),
         },
+    ]
+    sensors, _ = build_sensor_data(device_id)
+    live_context = "，".join(f"{item['name']}={item['value']}{item['unit']}" for item in sensors)
+    messages.append(
         {
             "role": "user",
-            "content": f"最近 {AI_HISTORY_LIMIT} 次历史记录如下：\n{format_history_for_ai()}",
-        },
-    ]
+            "content": (
+                f"当前界面设备：{profile['name']}（{device_id}）。"
+                f"实时数据：{live_context}。\n"
+                f"默认温室历史记录如下：\n{format_history_for_ai()}"
+            ),
+        }
+    )
     answer, error = request_kimi(messages)
     if error:
         return jsonify({"ok": False, "error": error}), 502
@@ -1057,7 +1076,7 @@ def ai_chat_api():
     control_command = parse_control_command_for_device(user_message, device_id)
     planner_error = ""
     if not control_command:
-        control_command, planner_error = plan_control_command_with_ai(user_message)
+        control_command, planner_error = plan_control_command_with_ai(user_message, device_id)
 
     if control_command:
         ok, answer = execute_control_command_for_device(control_command, device_id)
