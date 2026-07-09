@@ -6,20 +6,27 @@
 {% block head %}
 <style>
     .hardware-panel { padding: 28px; }
-    .hardware-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .hardware-head { margin-bottom: 18px; }
     .hardware-head h2 { margin: 0; color: #0f2f24; font-size: 24px; }
     .hardware-head p { margin: 8px 0 0; color: #6b8177; font-size: 14px; }
-    .switch-btn { height: 44px; padding: 0 22px; border: none; border-radius: 13px; color: white; background: #10b981; font-weight: 800; cursor: pointer; }
+    .device-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 20px; border: 1px solid #cfe5da; border-radius: 8px; background: #edf7f2; }
+    .device-tab { min-height: 40px; padding: 0 16px; border: 0; border-radius: 6px; color: #426559; background: transparent; font-weight: 700; cursor: pointer; }
+    .device-tab.active { color: #fff; background: #0f8f5d; box-shadow: 0 4px 12px rgba(15,143,93,.22); }
+    .state-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .state-pill { padding: 10px 14px; border-radius: 999px; background: rgba(16,185,129,.10); color: #0f7049; font-weight: 800; font-size: 13px; }
+    .state-pill.warn { background: #fff4df; color: #a65f00; }
+    .actuator-panel { margin-bottom: 20px; padding: 16px; border: 1px solid #dbece4; border-radius: 8px; background: #f8fcfa; }
+    .actuator-title { margin: 0 0 12px; color: #315f4c; font-size: 14px; }
+    .actuator-list { display: flex; flex-wrap: wrap; gap: 10px; }
+    .switch-btn { height: 42px; padding: 0 18px; border: 0; border-radius: 7px; color: #fff; background: #10b981; font-weight: 800; cursor: pointer; }
     .switch-btn.off { background: #ef4444; }
+    .device-tab:focus-visible, .switch-btn:focus-visible { outline: 3px solid rgba(47,128,237,.28); outline-offset: 2px; }
     .hardware-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-    .data-card { min-height: 130px; padding: 18px; border-radius: 18px; background: rgba(255,255,255,.92); border: 1px solid rgba(15,118,82,.12); box-shadow: 0 12px 28px rgba(0,80,50,.07); }
+    .data-card { min-height: 130px; padding: 18px; border-radius: 8px; background: rgba(255,255,255,.92); border: 1px solid rgba(15,118,82,.12); box-shadow: 0 12px 28px rgba(0,80,50,.07); }
     .data-card span { color: #7c9188; font-size: 13px; font-family: Consolas, monospace; }
     .data-card h3 { margin: 10px 0 20px; color: #0f2f24; font-size: 16px; }
     .data-card strong { color: #063f2c; font-size: 30px; }
     .data-card em { color: #6f8b7e; font-style: normal; margin-left: 5px; }
-    .state-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-    .state-pill { padding: 10px 14px; border-radius: 999px; background: rgba(16,185,129,.10); color: #0f7049; font-weight: 800; font-size: 13px; }
-    .state-pill.warn { background: #fff4df; color: #a65f00; }
     .notice { margin-top: 18px; color: #2f80ed; font-size: 14px; }
 </style>
 {% endblock %}
@@ -27,17 +34,27 @@
 {% block content %}
 <section class="hardware-panel section-card">
     <div class="hardware-head">
-        <div>
-            <h2>传感器数据展示</h2>
-            <p>每隔 5 秒自动获取一次传感器数据，并显示报警与设备开关状态</p>
-        </div>
-        <button class="switch-btn" id="deviceSwitch" type="button">打开设备</button>
+        <h2>传感器数据展示</h2>
+        <p>选择设备查看对应传感器，每 5 秒自动刷新一次。</p>
+    </div>
+
+    <div class="device-tabs" role="tablist" aria-label="设备切换">
+        {% for device in devices %}
+        <button class="device-tab {{ 'active' if loop.first else '' }}" type="button" role="tab"
+                data-device-id="{{ device.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+            {{ device.name }} · {{ device.id }}
+        </button>
+        {% endfor %}
     </div>
 
     <div class="state-row">
-        <div class="state-pill" id="alarmState">温度报警：--</div>
-        <div class="state-pill" id="deviceState">设备开关：关闭</div>
+        <div class="state-pill" id="deviceState">当前设备：--</div>
         <div class="state-pill {{ '' if cloud_authorized else 'warn' }}">云平台：{{ '已授权' if cloud_authorized else '未授权' }}</div>
+    </div>
+
+    <div class="actuator-panel">
+        <h3 class="actuator-title">执行器控制</h3>
+        <div class="actuator-list" id="actuatorList"></div>
     </div>
 
     <div class="hardware-grid" id="hardwareGrid"></div>
@@ -47,10 +64,12 @@
 <script>
     const hardwareGrid = document.getElementById("hardwareGrid");
     const hardwareNotice = document.getElementById("hardwareNotice");
-    const alarmState = document.getElementById("alarmState");
     const deviceState = document.getElementById("deviceState");
-    const deviceSwitch = document.getElementById("deviceSwitch");
-    let deviceEnabled = false;
+    const actuatorList = document.getElementById("actuatorList");
+    const deviceTabs = [...document.querySelectorAll(".device-tab")];
+    const devices = {{ devices | tojson }};
+    let currentDeviceId = devices[0].id;
+    const actuatorStates = {};
 
     function renderHardware(sensors) {
         hardwareGrid.innerHTML = sensors.map((sensor) => `
@@ -60,45 +79,73 @@
                 <strong>${sensor.value}</strong><em>${sensor.unit || ""}</em>
             </div>
         `).join("");
+    }
 
-        const alarm = sensors.find((sensor) => sensor.tag === "alarm");
-        alarmState.textContent = `温度报警：${alarm ? alarm.value : "--"}`;
-        alarmState.classList.toggle("warn", alarm && String(alarm.value) !== "0");
+    function renderActuators() {
+        const device = devices.find((item) => item.id === currentDeviceId);
+        deviceState.textContent = `当前设备：${device.name}（${device.id}）`;
+        actuatorList.innerHTML = device.actuators.map((actuator) => {
+            const enabled = Boolean(actuatorStates[`${currentDeviceId}:${actuator.tag}`]);
+            return `<button class="switch-btn ${enabled ? "off" : ""}" type="button" data-api-tag="${actuator.tag}">
+                ${enabled ? "关闭" : "打开"}${actuator.name}
+            </button>`;
+        }).join("");
     }
 
     async function loadHardwareData() {
+        const requestedDeviceId = currentDeviceId;
         try {
-            const response = await fetch("{{ url_for('sensor_api') }}", { cache: "no-store" });
+            const response = await fetch(`{{ url_for('sensor_api') }}?device_id=${encodeURIComponent(requestedDeviceId)}`, { cache: "no-store" });
             const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "数据获取失败");
+            if (requestedDeviceId !== currentDeviceId) return;
             renderHardware(data.sensors || []);
             hardwareNotice.textContent = `最新数据：${data.updated_at || "--"}`;
         } catch (error) {
-            hardwareNotice.textContent = "数据获取失败";
+            hardwareNotice.textContent = error.message;
         }
     }
 
-    deviceSwitch.addEventListener("click", async () => {
-        const next = !deviceEnabled;
-        deviceSwitch.disabled = true;
+    actuatorList.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-api-tag]");
+        if (!button) return;
+        const apiTag = button.dataset.apiTag;
+        const key = `${currentDeviceId}:${apiTag}`;
+        const next = !Boolean(actuatorStates[key]);
+        button.disabled = true;
         try {
             const response = await fetch("{{ url_for('device_switch_api') }}", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ enabled: next }),
+                body: JSON.stringify({ enabled: next, device_id: currentDeviceId, api_tag: apiTag }),
             });
             const data = await response.json();
             if (!data.ok) throw new Error(data.error || "设备控制失败");
-            deviceEnabled = next;
-            deviceState.textContent = `设备开关：${deviceEnabled ? "开启" : "关闭"}`;
-            deviceSwitch.textContent = deviceEnabled ? "关闭设备" : "打开设备";
-            deviceSwitch.classList.toggle("off", deviceEnabled);
+            actuatorStates[key] = next;
+            renderActuators();
+            hardwareNotice.textContent = "执行器状态已更新";
         } catch (error) {
             hardwareNotice.textContent = error.message;
-        } finally {
-            deviceSwitch.disabled = false;
+            button.disabled = false;
         }
     });
 
+    deviceTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+            currentDeviceId = tab.dataset.deviceId;
+            deviceTabs.forEach((item) => {
+                const active = item === tab;
+                item.classList.toggle("active", active);
+                item.setAttribute("aria-selected", String(active));
+            });
+            hardwareGrid.innerHTML = "";
+            hardwareNotice.textContent = "正在加载当前设备数据...";
+            renderActuators();
+            loadHardwareData();
+        });
+    });
+
+    renderActuators();
     loadHardwareData();
     setInterval(loadHardwareData, 5000);
 </script>

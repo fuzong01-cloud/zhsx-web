@@ -854,6 +854,10 @@
         border-bottom: none;
     }
 
+    .device-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 18px; border: 1px solid #cfe5da; border-radius: 8px; background: #edf7f2; }
+    .device-tab { min-height: 40px; padding: 0 16px; border: 0; border-radius: 6px; color: #426559; background: transparent; font-weight: 700; cursor: pointer; }
+    .device-tab.active { color: #fff; background: #0f8f5d; box-shadow: 0 4px 12px rgba(15,143,93,.22); }
+
     .ai-float {
         position: fixed;
         right: 28px;
@@ -1275,7 +1279,16 @@
         </div>
     </div>
 
-    <div class="sensor-grid">
+    <div class="device-tabs" role="tablist" aria-label="设备切换">
+        {% for device in devices %}
+        <button class="device-tab {{ 'active' if loop.first else '' }}" type="button" role="tab"
+                data-device-id="{{ device.id }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+            {{ device.name }} · {{ device.id }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <div class="sensor-grid" id="sensorGrid">
         {% for sensor in sensors %}
         <div class="metric-card" data-tag="{{ sensor.tag }}">
             <div class="metric-top">
@@ -1382,6 +1395,9 @@
     const refreshButton = document.getElementById("refreshSensors");
     const updatedAt = document.getElementById("updatedAt");
     const sensorNotice = document.getElementById("sensorNotice");
+    const sensorGrid = document.getElementById("sensorGrid");
+    const deviceTabs = [...document.querySelectorAll(".device-tab")];
+    const devices = {{ devices | tojson }};
     const historyTableBody = document.getElementById("historyTableBody");
     const historyCount = document.getElementById("historyCount");
     const trendSvg = document.getElementById("trendSvg");
@@ -1401,6 +1417,7 @@
     let lastAdviceAt = 0;
     let isAdviceLoading = false;
     let isChatLoading = false;
+    let currentDeviceId = devices[0].id;
 
     function updateAiControls() {
         if (aiInput) {
@@ -1423,37 +1440,16 @@
     }
 
     function updateSensorCards(sensors) {
-        sensors.forEach((sensor) => {
-            const card = document.querySelector(`.metric-card[data-tag="${sensor.tag}"]`);
-            if (!card) {
-                return;
-            }
-
-            const value = card.querySelector('[data-role="value"]');
-            const unit = card.querySelector('[data-role="unit"]');
-            const dot = card.querySelector('[data-role="dot"]');
-            const status = card.querySelector('[data-role="status"]');
-
-            if (value) {
-                value.textContent = sensor.value;
-                value.classList.remove("is-updated");
-                void value.offsetWidth;
-                value.classList.add("is-updated");
-            }
-
-            if (unit) {
-                unit.textContent = sensor.unit || "";
-            }
-
-            if (dot) {
-                dot.classList.toggle("danger", Boolean(sensor.error));
-                dot.classList.toggle("success", !sensor.error);
-            }
-
-            if (status) {
-                status.textContent = sensor.error || normalStatusText;
-            }
-        });
+        sensorGrid.innerHTML = sensors.map((sensor) => `
+            <div class="metric-card" data-tag="${sensor.tag}">
+                <div class="metric-top">
+                    <div class="metric-name"><span class="metric-icon green temp-shape"></span><strong>${sensor.name}</strong></div>
+                    <span class="metric-key">${sensor.tag}</span>
+                </div>
+                <div class="metric-value-row"><span class="metric-value">${sensor.value}</span><span class="metric-unit">${sensor.unit || ""}</span></div>
+                <div class="metric-footer"><span class="metric-dot ${sensor.error ? "danger" : "success"}"></span><span>${sensor.error || normalStatusText}</span></div>
+            </div>
+        `).join("");
     }
 
     function formatHistoryValue(values, tag) {
@@ -1659,7 +1655,7 @@
         aiAdvice.textContent = "AI 正在分析最近历史记录...";
 
         try {
-            const response = await fetch("{{ url_for('ai_advice_api') }}", {
+            const response = await fetch(`{{ url_for('ai_advice_api') }}?device_id=${encodeURIComponent(currentDeviceId)}`, {
                 headers: { "Accept": "application/json" },
                 cache: "no-store",
             });
@@ -1701,8 +1697,12 @@
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ message }),
+                body: JSON.stringify({ message, device_id: currentDeviceId }),
             });
+            const contentType = response.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+                throw new Error("AI 服务暂时异常，请刷新页面后重试。");
+            }
             const data = await response.json();
 
             if (!response.ok || !data.ok) {
@@ -1745,7 +1745,8 @@
         playCardAnimation();
 
         try {
-            const response = await fetch("{{ url_for('sensor_api') }}", {
+            const requestedDeviceId = currentDeviceId;
+            const response = await fetch(`{{ url_for('sensor_api') }}?device_id=${encodeURIComponent(requestedDeviceId)}`, {
                 headers: { "Accept": "application/json" },
                 cache: "no-store",
             });
@@ -1755,6 +1756,7 @@
             }
 
             const data = await response.json();
+            if (requestedDeviceId !== currentDeviceId) return;
             updateSensorCards(data.sensors || []);
 
             if (updatedAt && data.updated_at) {
@@ -1765,7 +1767,11 @@
                 sensorNotice.textContent = data.has_error ? "部分数据暂未获取成功，请检查云平台授权、设备在线状态或传感器标识。" : "传感器数据获取成功。";
             }
 
-            await refreshHistory();
+            if (currentDeviceId === "{{ device_id }}") {
+                await refreshHistory();
+            } else {
+                updateHistoryView([], { count: 0, alert: "当前设备暂无历史记录" });
+            }
             playCardAnimation();
         } catch (error) {
             console.error(error);
@@ -1788,6 +1794,22 @@
             refreshSensorData();
         });
     }
+
+    deviceTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+            currentDeviceId = tab.dataset.deviceId;
+            deviceTabs.forEach((item) => {
+                const active = item === tab;
+                item.classList.toggle("active", active);
+                item.setAttribute("aria-selected", String(active));
+            });
+            aiAdvice.textContent = `AI 已切换到当前设备：${tab.textContent.trim()}`;
+            aiMessages.innerHTML = `<div class="ai-msg assistant">现在分析和控制的是 ${tab.textContent.trim()}。</div>`;
+            lastAdviceAt = 0;
+            isRefreshing = false;
+            refreshSensorData();
+        });
+    });
 
     if (aiToggle && aiPanel) {
         aiToggle.addEventListener("click", () => {

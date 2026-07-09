@@ -63,6 +63,35 @@ DEVICE_COMMANDS = {
     "actuator": "actuator",
 }
 
+DEVICE_PROFILES = {
+    "1516155": {
+        "name": "\u6e29\u5ba4\u73af\u5883\u76d1\u6d4b",
+        "sensors": SENSORS,
+        "actuators": [{"name": "\u8bbe\u5907", "tag": "actuator"}],
+    },
+    "1517154": {
+        "name": "\u7f51\u5173\u667a\u6167\u519c\u4e1a",
+        "sensors": [
+            {"name": "\u6e29\u5ea6", "tag": "z_temperature", "unit": "\u2103", "icon": "thermometer"},
+            {"name": "\u6e7f\u5ea6", "tag": "z_humidity", "unit": "%", "icon": "droplets"},
+            {"name": "\u5149\u7167", "tag": "z_light", "unit": "Lux", "icon": "sun"},
+            {"name": "\u98ce\u901f", "tag": "m_wind_speed", "unit": "m/s", "icon": "wind"},
+            {"name": "\u6c34\u4f4d", "tag": "m_water_level", "unit": "cm", "icon": "waves"},
+            {"name": "\u6c34\u6e29", "tag": "m_water_temperature", "unit": "\u2103", "icon": "thermometer"},
+            {"name": "\u5927\u6c14\u538b\u529b", "tag": "m_pressure", "unit": "hPa", "icon": "gauge"},
+            {"name": "\u571f\u58e4\u6e29\u5ea6", "tag": "m_soil_temperature", "unit": "\u2103", "icon": "thermometer"},
+            {"name": "\u4e8c\u6c27\u5316\u78b3", "tag": "m_co2", "unit": "ppm", "icon": "cloud"},
+            {"name": "\u571f\u58e4\u6e7f\u5ea6", "tag": "m_soil_humidity", "unit": "%", "icon": "droplets"},
+        ],
+        "actuators": [
+            {"name": "\u98ce\u6247", "tag": "m_fan"},
+            {"name": "\u96fe\u5316\u5668", "tag": "pvxnpvryauoa"},
+            {"name": "\u6c34\u6cf5", "tag": "kismqtzkhmfr"},
+            {"name": "\u8865\u5149\u706f", "tag": "vlngwhheuwmw"},
+        ],
+    },
+}
+
 THRESHOLD_COMMANDS = {
     "upperLimit": "upperLimit",
     "lowerLimit": "lowerLimit",
@@ -215,13 +244,17 @@ def login_nlecloud(account, password):
     return token, ""
 
 
-def get_sensor_value(api_tag):
+def get_device_profile(device_id):
+    return DEVICE_PROFILES.get(str(device_id))
+
+
+def get_sensor_value(api_tag, device_id=NLE_DEVICE_ID):
     token = session.get("nle_access_token")
     if not token:
         return {"ok": False, "value": "--", "error": "请先完成云平台授权"}
 
-    params = urlencode({"deviceId": NLE_DEVICE_ID, "apiTag": api_tag})
-    url = f"{NLE_API_HOST}/devices/{NLE_DEVICE_ID}/Sensors/{api_tag}?{params}"
+    params = urlencode({"deviceId": device_id, "apiTag": api_tag})
+    url = f"{NLE_API_HOST}/devices/{device_id}/Sensors/{api_tag}?{params}"
     data, error = request_json(url, token=token)
 
     if error:
@@ -238,13 +271,13 @@ def get_sensor_value(api_tag):
     return {"ok": True, "value": value, "error": ""}
 
 
-def send_device_command(api_tag, value):
+def send_device_command(api_tag, value, device_id=NLE_DEVICE_ID):
     token = session.get("nle_access_token")
     if not token:
         return False, "请先完成云平台授权"
 
-    url = f"{NLE_API_HOST}/Cmds?deviceId={NLE_DEVICE_ID}&apiTag={api_tag}"
-    body = {"deviceId": NLE_DEVICE_ID, "apiTag": api_tag, "value": value}
+    url = f"{NLE_API_HOST}/Cmds?deviceId={device_id}&apiTag={api_tag}"
+    body = {"deviceId": device_id, "apiTag": api_tag, "value": value}
     data, error = request_json(url, method="POST", token=token, body=body)
     if error:
         return False, error
@@ -427,12 +460,47 @@ def execute_control_command(command):
     return False, "暂不支持这个控制指令。"
 
 
-def build_sensor_data():
+def parse_control_command_for_device(message, device_id):
+    text = message.replace(" ", "")
+    profile = get_device_profile(device_id)
+    if profile:
+        for actuator in profile["actuators"]:
+            if actuator["name"] in text:
+                if re.search(r"(\u6253\u5f00|\u5f00\u542f|\u542f\u52a8)", text):
+                    return {"type": "device_switch", "enabled": True, "api_tag": actuator["tag"]}
+                if re.search(r"(\u5173\u95ed|\u5173\u6389|\u505c\u6b62)", text):
+                    return {"type": "device_switch", "enabled": False, "api_tag": actuator["tag"]}
+    return parse_control_command(message)
+
+
+def execute_control_command_for_device(command, device_id):
+    if command["type"] == "device_switch":
+        profile = get_device_profile(device_id)
+        api_tag = command.get("api_tag") or DEVICE_COMMANDS["actuator"]
+        allowed = {item["tag"]: item["name"] for item in profile["actuators"]} if profile else {}
+        if api_tag not in allowed:
+            return False, "当前设备不支持这个执行器。"
+        ok, error = send_device_command(api_tag, 1 if command["enabled"] else 0, device_id)
+        if not ok:
+            return False, f"设备控制失败：{error}"
+        action = "打开" if command["enabled"] else "关闭"
+        return True, f"已执行：{action}{allowed[api_tag]}。"
+    if command["type"] == "thresholds":
+        if device_id != NLE_DEVICE_ID:
+            return False, "当前设备没有温度上下限控制。"
+        return apply_threshold_command(command.get("upper"), command.get("lower"))
+    return False, "暂不支持这个控制指令。"
+
+
+def build_sensor_data(device_id=NLE_DEVICE_ID):
+    profile = get_device_profile(device_id)
+    if not profile:
+        return [], True
     sensor_data = []
     has_error = False
 
-    for sensor in SENSORS:
-        result = get_sensor_value(sensor["tag"])
+    for sensor in profile["sensors"]:
+        result = get_sensor_value(sensor["tag"], device_id)
         has_error = has_error or not result["ok"]
         sensor_data.append(
             {
@@ -796,6 +864,10 @@ def home():
         username=username,
         user=USERS[username],
         device_id=NLE_DEVICE_ID,
+        devices=[
+            {"id": device_id, "name": profile["name"]}
+            for device_id, profile in DEVICE_PROFILES.items()
+        ],
         sensors=build_sensor_placeholders(),
         has_error=False,
         updated_at="等待加载",
@@ -808,9 +880,13 @@ def sensor_api():
     if not session.get("username"):
         return jsonify({"ok": False, "error": "未登录"}), 401
 
-    sensors, has_error = build_sensor_data()
+    device_id = request.args.get("device_id", NLE_DEVICE_ID)
+    if not get_device_profile(device_id):
+        return jsonify({"ok": False, "error": "未知设备"}), 404
+    sensors, has_error = build_sensor_data(device_id)
     updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_sensor_history(sensors, updated_at)
+    if device_id == NLE_DEVICE_ID:
+        append_sensor_history(sensors, updated_at)
 
     return jsonify(
         {
@@ -818,6 +894,7 @@ def sensor_api():
             "sensors": sensors,
             "has_error": has_error,
             "updated_at": updated_at,
+            "device_id": device_id,
         }
     )
 
@@ -833,12 +910,47 @@ def history_api():
     return jsonify({"ok": True, "history": history, "stats": stats})
 
 
+@app.route("/database")
+def database_view():
+    if not session.get("username"):
+        return redirect(url_for("login"))
+
+    allowed_tables = {
+        "users": "账号信息",
+        "temperature_records": "温度历史",
+        "actuator_status": "执行器状态",
+    }
+    table = request.args.get("table", "temperature_records")
+    if table not in allowed_tables:
+        table = "temperature_records"
+
+    with get_db() as conn:
+        columns = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})")]
+        rows = conn.execute(f"SELECT * FROM {table} ORDER BY rowid DESC LIMIT 200").fetchall()
+
+    return render_template(
+        "database.html",
+        tables=allowed_tables,
+        active_table=table,
+        columns=columns,
+        rows=[dict(row) for row in rows],
+    )
+
+
 @app.route("/hardware")
 def hardware():
     if not session.get("username"):
         return redirect(url_for("login"))
 
-    return render_template("hardware.html", cloud_authorized=bool(session.get("nle_access_token")))
+    devices = [
+        {"id": device_id, "name": profile["name"], "actuators": profile["actuators"]}
+        for device_id, profile in DEVICE_PROFILES.items()
+    ]
+    return render_template(
+        "hardware.html",
+        cloud_authorized=bool(session.get("nle_access_token")),
+        devices=devices,
+    )
 
 
 @app.route("/strategy")
@@ -856,8 +968,14 @@ def device_switch_api():
 
     payload = request.get_json(silent=True) or {}
     enabled = bool(payload.get("enabled"))
-    ok, error = send_device_command(DEVICE_COMMANDS["actuator"], 1 if enabled else 0)
-    if ok:
+    device_id = str(payload.get("device_id") or NLE_DEVICE_ID)
+    api_tag = str(payload.get("api_tag") or DEVICE_COMMANDS["actuator"])
+    profile = get_device_profile(device_id)
+    allowed_tags = {item["tag"] for item in profile["actuators"]} if profile else set()
+    if api_tag not in allowed_tags:
+        return jsonify({"ok": False, "error": "未知执行器"}), 400
+    ok, error = send_device_command(api_tag, 1 if enabled else 0, device_id)
+    if ok and device_id == NLE_DEVICE_ID and api_tag == DEVICE_COMMANDS["actuator"]:
         insert_actuator_status(status=1 if enabled else 0)
     return jsonify({"ok": ok, "error": error, "enabled": enabled})
 
@@ -893,6 +1011,10 @@ def thresholds_api():
 
 @app.route("/api/ai-advice")
 def ai_advice_api():
+    device_id = request.args.get("device_id", NLE_DEVICE_ID)
+    profile = get_device_profile(device_id)
+    if not profile:
+        return jsonify({"ok": False, "error": "未知设备"}), 404
     if not session.get("username"):
         return jsonify({"ok": False, "error": "未登录"}), 401
 
@@ -924,17 +1046,21 @@ def ai_chat_api():
 
     payload = request.get_json(silent=True) or {}
     user_message = (payload.get("message") or "").strip()
+    device_id = str(payload.get("device_id") or NLE_DEVICE_ID)
+    current_device = get_device_profile(device_id)
+    if not current_device:
+        return jsonify({"ok": False, "error": "未知设备"}), 404
     if not user_message:
         return jsonify({"ok": False, "error": "请输入问题"}), 400
 
     chat_history = get_ai_chat_history()
-    control_command = parse_control_command(user_message)
+    control_command = parse_control_command_for_device(user_message, device_id)
     planner_error = ""
     if not control_command:
         control_command, planner_error = plan_control_command_with_ai(user_message)
 
     if control_command:
-        ok, answer = execute_control_command(control_command)
+        ok, answer = execute_control_command_for_device(control_command, device_id)
         chat_history.extend(
             [
                 {"role": "user", "content": user_message},
@@ -963,11 +1089,17 @@ def ai_chat_api():
             "content": f"当前系统最近 {AI_HISTORY_LIMIT} 次历史记录：\n{format_history_for_ai()}",
         },
     ]
+    sensors, _ = build_sensor_data(device_id)
+    live_context = "，".join(f"{item['name']}={item['value']}{item['unit']}" for item in sensors)
+    messages.append({"role": "system", "content": f"当前界面设备：{get_device_profile(device_id)['name']}（{device_id}），实时数据：{live_context}。回答必须以当前设备为准。"})
     messages.extend(chat_history)
     if planner_error:
         messages.append({"role": "system", "content": f"控制意图解析暂不可用：{planner_error}"})
     messages.append({"role": "user", "content": user_message})
 
+    sensors, _ = build_sensor_data(device_id)
+    live_context = "，".join(f"{item['name']}={item['value']}{item['unit']}" for item in sensors)
+    messages.append({"role": "user", "content": f"当前界面设备：{current_device['name']}（{device_id}），实时数据：{live_context}"})
     answer, error = request_kimi(messages)
     if error:
         return jsonify({"ok": False, "error": error}), 502

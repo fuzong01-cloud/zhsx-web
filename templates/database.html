@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}数据库查看{% endblock %}
+{% block page_title %}数据库查看{% endblock %}
+
+{% block head %}
+<style>
+    .database-page {
+        padding: 28px;
+        background: #ffffff;
+        border: 1px solid rgba(15, 118, 82, 0.12);
+        border-radius: 8px;
+        box-shadow: 0 18px 48px rgba(0, 70, 45, 0.08);
+    }
+
+    .database-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+    }
+
+    .database-head h2 {
+        margin: 0 0 6px;
+        color: #123c2c;
+        font-size: 24px;
+    }
+
+    .database-head p {
+        margin: 0;
+        color: #71857d;
+    }
+
+    .database-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 18px;
+    }
+
+    .database-tab {
+        padding: 9px 14px;
+        border: 1px solid rgba(15, 118, 82, 0.16);
+        border-radius: 6px;
+        color: #365a4c;
+        background: #f7fbf9;
+        text-decoration: none;
+        font-weight: 700;
+    }
+
+    .database-tab.active {
+        color: #ffffff;
+        background: #0f8f5d;
+        border-color: #0f8f5d;
+    }
+
+    .database-table-wrap {
+        overflow: auto;
+        max-height: 620px;
+        border: 1px solid rgba(15, 118, 82, 0.12);
+    }
+
+    .database-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 860px;
+        font-size: 13px;
+    }
+
+    .database-table th,
+    .database-table td {
+        padding: 11px 13px;
+        border-bottom: 1px solid rgba(15, 118, 82, 0.09);
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .database-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        color: #214b3a;
+        background: #edf7f2;
+    }
+
+    .database-empty {
+        padding: 44px;
+        color: #71857d;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="database-page">
+    <div class="database-head">
+        <div>
+            <h2>SQLite 数据库</h2>
+            <p>显示最近 200 条记录，最新记录在最上方。</p>
+        </div>
+    </div>
+
+    <nav class="database-tabs">
+        {% for table, label in tables.items() %}
+        <a
+            class="database-tab {{ 'active' if table == active_table else '' }}"
+            href="{{ url_for('database_view', table=table) }}"
+        >{{ label }}</a>
+        {% endfor %}
+    </nav>
+
+    <div class="database-table-wrap">
+        {% if rows %}
+        <table class="database-table">
+            <thead>
+                <tr>
+                    {% for column in columns %}
+                    <th>{{ column }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    {% for column in columns %}
+                    <td>{{ row[column] if row[column] is not none else '--' }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="database-empty">当前数据表暂无记录。</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
